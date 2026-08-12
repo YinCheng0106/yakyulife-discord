@@ -6,7 +6,7 @@
   "exports": "./src/index.ts",
   "dependencies": {
     "@yakyulife/core": "workspace:*",
-    "discord.js": "14.26.4",
-    "sharp": "0.34.3"
+    "discord.js": "14.27.0",
+    "sharp": "0.35.3"
   }
 }
