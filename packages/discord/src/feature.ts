@@ -96,27 +96,26 @@ async function handleStart(
 
   if (mode === "dm") {
     const dm = await interaction.user.createDM();
-    const probe = await dm.send({
-      content: "正在建立 YaKyuLife 投手生涯……",
-      allowedMentions: { parse: [] },
+    const career = await service.start({
+      discordUserId: interaction.user.id,
+      name:
+        interaction.options.getString("name") ??
+        Array.from(interaction.user.displayName).slice(0, 10).join(""),
+      seed: interaction.options.getString("seed") ?? crypto.randomUUID().slice(0, 12),
+      playMode: mode,
+      location: { guildId: null, channelId: dm.id, messageId: null },
     });
-    try {
-      const career = await service.start({
-        discordUserId: interaction.user.id,
-        name:
-          interaction.options.getString("name") ??
-          Array.from(interaction.user.displayName).slice(0, 10).join(""),
-        seed: interaction.options.getString("seed") ?? crypto.randomUUID().slice(0, 12),
-        playMode: mode,
-        location: { guildId: null, channelId: dm.id, messageId: probe.id },
-      });
-      await probe.edit(renderCareer(career));
-      await interaction.editReply("已在私訊中開啟投手生涯。");
-      return;
-    } catch (error) {
-      await probe.delete().catch(() => undefined);
+    const message = await dm.send(renderCareer(career)).catch(async (error: unknown) => {
+      await service.abandon(career.id, career.discordUserId).catch(() => undefined);
       throw error;
-    }
+    });
+    await service.updateLocation(career.id, career.discordUserId, {
+      guildId: null,
+      channelId: dm.id,
+      messageId: message.id,
+    });
+    await interaction.editReply("已在私訊中開啟投手生涯。");
+    return;
   }
 
   const career = await service.start({
