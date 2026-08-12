@@ -1,0 +1,12 @@
+{
+  "name": "@yakyulife/bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@yakyulife/core": "workspace:*",
+    "@yakyulife/discord": "workspace:*",
+    "@yakyulife/postgres": "workspace:*",
+    "discord.js": "14.26.4"
+  }
+}

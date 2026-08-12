@@ -1,0 +1,16 @@
+{
+  "engineVersion": "0.1.0",
+  "seed": "golden-v1",
+  "actions": [
+    {
+      "type": "allocate_training",
+      "primary": "velocity",
+      "secondary": "control"
+    },
+    {
+      "type": "choose_event",
+      "strategy": "normal"
+    }
+  ],
+  "stateSha256": "e2cba42ae84358aa51c02a4b48c79fafab46217cbb15691d2526f4e64ae16f72"
+}

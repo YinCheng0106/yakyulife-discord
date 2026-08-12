@@ -1,0 +1,12 @@
+{
+  "name": "@yakyulife/discord",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@yakyulife/core": "workspace:*",
+    "discord.js": "14.26.4",
+    "sharp": "0.34.3"
+  }
+}

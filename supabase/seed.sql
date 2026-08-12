@@ -1,0 +1,1 @@
+-- MVP currently has no reference rows. Game rules are versioned in @yakyulife/core.
