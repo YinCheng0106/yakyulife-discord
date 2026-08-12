@@ -1,9 +1,12 @@
 import type { Logger } from "@yakyulife/core";
+import signale from "signale";
 
 const priorities = { debug: 10, info: 20, warn: 30, error: 40 } as const;
 type Level = keyof typeof priorities;
 
 export function createLogger(minimumLevel: Level): Logger {
+  const logger = new signale.Signale({ scope: "BOT" });
+
   function write(
     level: Level,
     message: string,
@@ -11,24 +14,12 @@ export function createLogger(minimumLevel: Level): Logger {
     context?: Record<string, unknown>,
   ): void {
     if (priorities[level] < priorities[minimumLevel]) return;
-    const entry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
+    const details = {
       ...context,
-      ...(error === undefined
-        ? {}
-        : {
-            error:
-              error instanceof Error
-                ? { name: error.name, message: error.message, stack: error.stack }
-                : String(error),
-          }),
+      ...(error === undefined ? {} : { error }),
     };
-    const output = JSON.stringify(entry);
-    if (level === "error") console.error(output);
-    else if (level === "warn") console.warn(output);
-    else console.log(output);
+    const hasDetails = Object.keys(details).length > 0;
+    logger[level](message, ...(hasDetails ? [details] : []));
   }
   return {
     debug: (message, context) => write("debug", message, undefined, context),

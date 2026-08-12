@@ -4,6 +4,10 @@ interface PackageManifest {
   devDependencies?: Record<string, string>;
 }
 
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("TOOLCHAIN");
+
 const manifest = (await Bun.file("package.json").json()) as PackageManifest;
 const expected = manifest.packageManager?.replace(/^bun@/, "");
 if (!expected) throw new Error("packageManager must pin Bun");
@@ -25,4 +29,4 @@ if (
 const workflow = await Bun.file(".github/workflows/ci.yml").text();
 if (!workflow.includes(`bun-version: ${expected}`))
   throw new Error("CI Bun version is not synchronized");
-console.log(`Bun toolchain pins are synchronized at ${expected}.`);
+logger.success(`Bun toolchain pins are synchronized at ${expected}.`);

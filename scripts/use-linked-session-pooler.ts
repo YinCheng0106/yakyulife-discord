@@ -1,4 +1,7 @@
 import { chmod } from "node:fs/promises";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("DB");
 
 const envPath = ".env";
 const backupPath = ".env.before-session-pooler";
@@ -35,11 +38,11 @@ if (!linePattern.test(source)) throw new Error(".env 沒有 DATABASE_URL 欄位"
 const updated = source.replace(linePattern, `DATABASE_URL=${pooler.toString()}`);
 
 if (updated === source) {
-  console.log("DATABASE_URL 已使用 linked Supavisor session endpoint，無需修改。");
+  logger.success("DATABASE_URL 已使用 linked Supavisor session endpoint，無需修改。");
   process.exit(0);
 }
 if (!(await Bun.file(backupPath).exists())) await Bun.write(backupPath, source);
 await Bun.write(envPath, updated);
 await Promise.all([chmod(envPath, 0o600), chmod(backupPath, 0o600)]);
-console.log("已將 DATABASE_URL 切換到 linked Supavisor session mode（port 5432）。");
-console.log(`原始設定已備份至 ${backupPath}；兩個檔案都已限制為目前使用者讀寫。`);
+logger.success("已將 DATABASE_URL 切換到 linked Supavisor session mode（port 5432）。");
+logger.info(`原始設定已備份至 ${backupPath}；兩個檔案都已限制為目前使用者讀寫。`);

@@ -1,5 +1,8 @@
 import { careerCommands } from "@yakyulife/discord";
 import { REST, Routes } from "discord.js";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("COMMANDS");
 
 const token = process.env.DISCORD_TOKEN?.trim();
 const applicationId = process.env.DISCORD_APPLICATION_ID?.trim();
@@ -12,6 +15,6 @@ const route = guildId
   ? Routes.applicationGuildCommands(applicationId, guildId)
   : Routes.applicationCommands(applicationId);
 await rest.put(route, { body: careerCommands });
-console.log(
+logger.success(
   `Deployed ${careerCommands.length} command definition(s) to ${guildId ? `guild ${guildId}` : "global"}.`,
 );

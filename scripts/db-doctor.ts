@@ -1,6 +1,9 @@
 import { promises as dns } from "node:dns";
 import { createConnection } from "node:net";
 import { SQL } from "bun";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("DB");
 
 type EndpointKind =
   | "supabase-direct"
@@ -102,7 +105,7 @@ if (tcp.ok && !current.ok && configuredSslMode !== "require") {
   requireSsl = await sqlProbe(requireSslUrl.toString());
 }
 
-console.log(
+logger.info(
   JSON.stringify(
     {
       endpoint: {
@@ -123,7 +126,7 @@ console.log(
 );
 
 if (current.ok || requireSsl?.ok) {
-  console.log(
+  logger.success(
     requireSsl?.ok
       ? "診斷：連線成功；請在 DATABASE_URL 加上 ?sslmode=require。"
       : "診斷：資料庫連線成功。",
@@ -131,18 +134,16 @@ if (current.ok || requireSsl?.ok) {
   process.exit(0);
 }
 if (kind === "supabase-direct" && ipv4Records === 0 && ipv6Records > 0 && !tcp.ok) {
-  console.error(
+  logger.error(
     "診斷：direct endpoint 只有 IPv6，而目前網路無法連線。請改用 Supavisor session mode（port 5432）。",
   );
 } else if (tcp.ok && kind.startsWith("supavisor")) {
-  console.error(
+  logger.error(
     "診斷：已連到 Supavisor，但 PostgreSQL 驗證階段被關閉。請重新複製完整連線字串並檢查 project ref、帳號、資料庫密碼與 percent-encoding。 ",
   );
 } else if (!tcp.ok) {
-  console.error(
-    "診斷：TCP 連線失敗。請檢查 endpoint、port、DNS、防火牆及 Supabase 專案是否暫停。 ",
-  );
+  logger.error("診斷：TCP 連線失敗。請檢查 endpoint、port、DNS、防火牆及 Supabase 專案是否暫停。 ");
 } else {
-  console.error("診斷：TCP 可達，但 PostgreSQL 連線失敗。請檢查資料庫憑證、TLS 與專案狀態。 ");
+  logger.error("診斷：TCP 可達，但 PostgreSQL 連線失敗。請檢查資料庫憑證、TLS 與專案狀態。 ");
 }
 process.exit(1);

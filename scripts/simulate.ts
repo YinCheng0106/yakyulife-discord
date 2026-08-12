@@ -1,5 +1,8 @@
 import { createCareerState } from "@yakyulife/core";
 import { assertFiniteTree, runCareer } from "../tests/helpers/simulation.ts";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("SIMULATION");
 
 const count = Number(process.env.SIMULATION_COUNT ?? "10000");
 if (!Number.isInteger(count) || count < 1)
@@ -17,7 +20,7 @@ const median = actionCounts[Math.floor(actionCounts.length / 2)] ?? 0;
 const maximum = actionCounts.at(-1) ?? 0;
 if (maximum > 100) throw new Error(`Simulation exceeded action limit: ${maximum}`);
 if (median > 60) throw new Error(`Median interaction count exceeds target: ${median}`);
-console.log(
+logger.success(
   JSON.stringify(
     { careers: count, medianActions: median, maxActions: maximum, professionalCareers },
     null,

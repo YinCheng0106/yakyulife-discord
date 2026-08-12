@@ -1,4 +1,7 @@
 import { buildDbPushCommand } from "./db-push-config.ts";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("DB");
 
 const bun = Bun.which("bun");
 if (!bun) throw new Error("Bun executable was not found");
@@ -20,7 +23,7 @@ try {
     dryRun: process.argv.includes("--dry-run"),
   });
 } catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
+  logger.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 const processHandle = Bun.spawn(command, {

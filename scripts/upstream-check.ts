@@ -1,4 +1,7 @@
 import { UPSTREAM_COMMIT } from "@yakyulife/core";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("UPSTREAM");
 
 const response = await fetch("https://api.github.com/repos/LeoGGcat/yakyulife/commits/main", {
   headers: {
@@ -13,13 +16,13 @@ const payload = (await response.json()) as {
   commit?: { message?: string };
 };
 if (!payload.sha) throw new Error("GitHub response did not contain a commit SHA");
-console.log(`Pinned upstream: ${UPSTREAM_COMMIT}`);
-console.log(`Current upstream: ${payload.sha}`);
-console.log(
+logger.info(`Pinned upstream: ${UPSTREAM_COMMIT}`);
+logger.info(`Current upstream: ${payload.sha}`);
+logger.info(
   payload.sha === UPSTREAM_COMMIT
     ? "No upstream change detected."
     : "Upstream changed; review manually before porting rules.",
 );
 if (payload.commit?.message)
-  console.log(`Latest message: ${payload.commit.message.split("\n")[0]}`);
-if (payload.html_url) console.log(payload.html_url);
+  logger.info(`Latest message: ${payload.commit.message.split("\n")[0]}`);
+if (payload.html_url) logger.info(payload.html_url);

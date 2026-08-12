@@ -1,4 +1,7 @@
 import { SQL } from "bun";
+import { createScriptLogger } from "./logger.ts";
+
+const logger = createScriptLogger("DB");
 
 const glob = new Bun.Glob("*.sql");
 const migrationPaths = [...glob.scanSync({ cwd: "supabase/migrations", absolute: true })].sort();
@@ -35,7 +38,7 @@ if (databaseUrl) {
     );
   }
   await sql.close();
-  console.log("Migration files and connected database verified.");
+  logger.success("Migration files and connected database verified.");
 } else {
-  console.log("Migration files verified. Set TEST_DATABASE_URL for live schema verification.");
+  logger.success("Migration files verified. Set TEST_DATABASE_URL for live schema verification.");
 }
