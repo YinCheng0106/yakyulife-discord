@@ -1,4 +1,4 @@
-# YaKyoLife 上游同步紀錄
+# YaKyuLife 上游同步紀錄
 
 ## 第一版基準
 

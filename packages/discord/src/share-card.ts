@@ -18,7 +18,7 @@ export const sharpShareCardRenderer: ShareCardRenderer = {
   async render(career) {
     const summary = career.summary;
     if (!summary) throw new Error("Career is not completed");
-    const attribution = ATTRIBUTION.split("\n")[0] ?? "YaKyoLife attribution";
+    const attribution = ATTRIBUTION.split("\n")[0] ?? "YaKyuLife attribution";
     const svg = `
       <svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
         <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#102f24"/><stop offset="1" stop-color="#1f8b4c"/></linearGradient></defs>

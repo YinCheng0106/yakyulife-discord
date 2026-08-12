@@ -1,8 +1,8 @@
-# YaKyoLife Discord Bot
+# YaKyuLife Discord Bot
 
-YaKyoLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supabase PostgreSQL 製作的非營利投手生涯模擬 Bot。MVP 提供高中、大學選秀、中職二軍／一軍、訓練、年度事件、傷病、TJ、合約、FA、衰退、引退與 PNG 分享卡。
+YaKyuLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supabase PostgreSQL 製作的非營利投手生涯模擬 Bot。MVP 提供高中、大學選秀、中職二軍／一軍、訓練、年度事件、傷病、TJ、合約、FA、衰退、引退與 PNG 分享卡。
 
-本專案改編自 [LeoGGcat／YaKyoLife](https://github.com/LeoGGcat/yakyulife)，規則基準為 [`913cad27`](https://github.com/LeoGGcat/yakyulife/commit/913cad27db86bda79cbd53dc5666ab15d28c5d2d)，依 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 授權。這是獨立改作，不代表原作者背書，不得用於廣告、付費功能或其他商業用途。
+本專案改編自 [LeoGGcat／YaKyuLife](https://github.com/LeoGGcat/yakyulife)，規則基準為 [`913cad27`](https://github.com/LeoGGcat/yakyulife/commit/913cad27db86bda79cbd53dc5666ab15d28c5d2d)，依 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 授權。這是獨立改作，不代表原作者背書，不得用於廣告、付費功能或其他商業用途。
 
 ## 架構
 

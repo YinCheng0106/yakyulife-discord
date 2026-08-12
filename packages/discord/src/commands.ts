@@ -3,7 +3,7 @@ import { type RESTPostAPIApplicationCommandsJSONBody, SlashCommandBuilder } from
 export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] = [
   new SlashCommandBuilder()
     .setName("career")
-    .setDescription("開始或管理 YaKyoLife 投手生涯")
+    .setDescription("開始或管理 YaKyuLife 投手生涯")
     .addSubcommand((command) =>
       command
         .setName("start")
@@ -39,7 +39,7 @@ export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] =
       command.setName("share").setDescription("產生已完成生涯的 PNG 分享卡"),
     )
     .addSubcommand((command) =>
-      command.setName("delete-data").setDescription("刪除自己的所有 YaKyoLife 資料"),
+      command.setName("delete-data").setDescription("刪除自己的所有 YaKyuLife 資料"),
     )
     .addSubcommand((command) => command.setName("about").setDescription("查看來源、授權與版本資訊"))
     .toJSON(),

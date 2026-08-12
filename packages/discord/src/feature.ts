@@ -97,7 +97,7 @@ async function handleStart(
   if (mode === "dm") {
     const dm = await interaction.user.createDM();
     const probe = await dm.send({
-      content: "正在建立 YaKyoLife 投手生涯……",
+      content: "正在建立 YaKyuLife 投手生涯……",
       allowedMentions: { parse: [] },
     });
     try {
@@ -227,7 +227,7 @@ async function handleCommand(
     return;
   }
   await interaction.reply({
-    content: `**YaKyoLife Discord Bot**\nEngine ${ENGINE_VERSION}｜上游 ${UPSTREAM_COMMIT.slice(0, 8)}\n${ATTRIBUTION}\n授權：https://creativecommons.org/licenses/by-nc/4.0/`,
+    content: `**YaKyuLife Discord Bot**\nEngine ${ENGINE_VERSION}｜上游 ${UPSTREAM_COMMIT.slice(0, 8)}\n${ATTRIBUTION}\n授權：https://creativecommons.org/licenses/by-nc/4.0/`,
     flags: ephemeral,
     allowedMentions: { parse: [] },
   });
