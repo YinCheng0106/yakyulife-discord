@@ -9,12 +9,16 @@ import {
   UPSTREAM_COMMIT,
 } from "@yakyulife/core";
 import {
+  type APIContainerComponent,
   AttachmentBuilder,
   type ButtonInteraction,
   type ChatInputCommandInteraction,
+  ContainerBuilder,
   type Interaction,
+  type InteractionReplyOptions,
   MessageFlags,
   type RESTPostAPIApplicationCommandsJSONBody,
+  TextDisplayBuilder,
 } from "discord.js";
 import { actionFromKey, parseCareerCustomId } from "./actions.ts";
 import { ATTRIBUTION } from "./attribution.ts";
@@ -34,6 +38,31 @@ export interface CareerFeatureDependencies {
 }
 
 const ephemeral = MessageFlags.Ephemeral;
+
+interface TextContainerMessage {
+  components: APIContainerComponent[];
+  flags: MessageFlags.IsComponentsV2;
+  allowedMentions: { parse: [] };
+}
+
+function textContainer(content: string): TextContainerMessage {
+  return {
+    components: [
+      new ContainerBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(content))
+        .toJSON(),
+    ],
+    flags: MessageFlags.IsComponentsV2,
+    allowedMentions: { parse: [] },
+  };
+}
+
+function ephemeralTextContainer(content: string): InteractionReplyOptions {
+  return {
+    ...textContainer(content),
+    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+  };
+}
 
 async function editCareerMessage(
   interaction: ButtonInteraction,
@@ -55,10 +84,7 @@ async function sendCareer(
       channelId: dm.id,
       messageId: message.id,
     });
-    await interaction.editReply({
-      content: "已在私訊中開啟投手生涯。",
-      allowedMentions: { parse: [] },
-    });
+    await interaction.editReply(textContainer("已在私訊中開啟投手生涯。"));
     return;
   }
   await interaction.editReply(renderCareer(career));
@@ -114,7 +140,7 @@ async function handleStart(
       channelId: dm.id,
       messageId: message.id,
     });
-    await interaction.editReply("已在私訊中開啟投手生涯。");
+    await interaction.editReply(textContainer("已在私訊中開啟投手生涯。"));
     return;
   }
 
@@ -141,12 +167,14 @@ async function handleContinue(
   await interaction.deferReply({ flags: ephemeral });
   const career = await service.getActive(interaction.user.id);
   if (!career) {
-    await interaction.editReply("目前沒有進行中的生涯，請使用 `/career start`。");
+    await interaction.editReply(textContainer("目前沒有進行中的生涯，請使用 `/career start`"));
     return;
   }
   if (await refreshStoredMessage(interaction, career)) {
     await interaction.editReply(
-      career.playMode === "dm" ? "已更新原本的私訊遊戲畫面。" : "已更新原本的頻道遊戲畫面。",
+      textContainer(
+        career.playMode === "dm" ? "已更新原本的私訊遊戲畫面" : "已更新原本的頻道遊戲畫面",
+      ),
     );
     return;
   }
@@ -163,7 +191,7 @@ async function handleContinue(
     messageId: message.id,
   });
   await interaction.editReply(
-    "已在目前頻道重建遊戲訊息。無法找回已刪除的舊訊息時，請以新訊息為準。",
+    textContainer("已在目前頻道重建遊戲訊息。無法找回已刪除的舊訊息時，請以新訊息為準"),
   );
 }
 
@@ -174,17 +202,17 @@ async function handleStatus(
   await interaction.deferReply({ flags: ephemeral });
   const career = await service.getActive(interaction.user.id);
   if (!career) {
-    await interaction.editReply("目前沒有進行中的生涯。");
+    await interaction.editReply(textContainer("目前沒有進行中的生涯"));
     return;
   }
   const state = career.state;
-  await interaction.editReply({
-    content:
+  await interaction.editReply(
+    textContainer(
       `**${state.name}**｜${state.year} 年｜${state.age} 歲｜${state.team}\n` +
-      `體力 ${state.abilities.stamina}｜球速 ${state.abilities.velocity}｜控球 ${state.abilities.control}｜變化球 ${state.abilities.breaking}\n` +
-      `Revision ${career.stateRevision}｜模式：${career.playMode === "dm" ? "私訊" : "頻道"}`,
-    allowedMentions: { parse: [] },
-  });
+        `體力 ${state.abilities.stamina}｜球速 ${state.abilities.velocity}｜控球 ${state.abilities.control}｜變化球 ${state.abilities.breaking}\n` +
+        `Revision ${career.stateRevision}｜模式：${career.playMode === "dm" ? "私訊" : "頻道"}`,
+    ),
+  );
 }
 
 async function handleCommand(
@@ -201,35 +229,38 @@ async function handleCommand(
     const abandoned = active
       ? await dependencies.careerService.abandon(active.id, interaction.user.id)
       : false;
-    await interaction.editReply(abandoned ? "已放棄目前生涯。" : "目前沒有可放棄的生涯。");
+    await interaction.editReply(
+      textContainer(abandoned ? "已放棄目前生涯" : "目前沒有可放棄的生涯"),
+    );
     return;
   }
   if (subcommand === "delete-data") {
     await interaction.deferReply({ flags: ephemeral });
     const count = await dependencies.careerService.deleteData(interaction.user.id);
-    await interaction.editReply(`已刪除 ${count} 筆生涯資料；此操作無法復原。`);
+    await interaction.editReply(textContainer(`已刪除 ${count} 筆生涯資料；此操作無法復原`));
     return;
   }
   if (subcommand === "share") {
     await interaction.deferReply({ flags: ephemeral });
     const career = await dependencies.careerService.getLatestCompleted(interaction.user.id);
     if (!career?.summary) {
-      await interaction.editReply("目前沒有已完成且可分享的生涯。完成生涯後即可產生 PNG 卡片。");
+      await interaction.editReply(
+        textContainer("目前沒有已完成且可分享的生涯。完成生涯後即可產生 PNG 卡片"),
+      );
       return;
     }
     const png = await dependencies.shareCardRenderer.render(career);
     await interaction.editReply({
-      content: ATTRIBUTION,
+      ...textContainer(ATTRIBUTION),
       files: [new AttachmentBuilder(png, { name: `yakyulife-${career.id}.png` })],
-      allowedMentions: { parse: [] },
     });
     return;
   }
-  await interaction.reply({
-    content: `**YaKyuLife Discord Bot**\nEngine ${ENGINE_VERSION}｜上游 ${UPSTREAM_COMMIT.slice(0, 8)}\n${ATTRIBUTION}\n授權：https://creativecommons.org/licenses/by-nc/4.0/`,
-    flags: ephemeral,
-    allowedMentions: { parse: [] },
-  });
+  await interaction.reply(
+    ephemeralTextContainer(
+      `# YaKyuLife Discord Bot\nEngine \`${ENGINE_VERSION}\`｜上游 \`${UPSTREAM_COMMIT.slice(0, 8)}\`\n${ATTRIBUTION}\n授權：[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)`,
+    ),
+  );
 }
 
 async function handleButton(
@@ -241,7 +272,7 @@ async function handleButton(
   await interaction.deferUpdate();
   const action = actionFromKey(parsed.actionKey);
   if (!action) {
-    await interaction.followUp({ content: "這個操作已不受目前版本支援。", flags: ephemeral });
+    await interaction.followUp(ephemeralTextContainer("這個操作已不受目前版本支援"));
     return;
   }
   const result = await dependencies.careerService.applyAction({
@@ -257,18 +288,18 @@ async function handleButton(
   }
   if (result.status === "duplicate") return;
   if (result.status === "stale") {
-    await interaction.followUp({ content: "畫面已過期，請以最新遊戲訊息為準。", flags: ephemeral });
+    await interaction.followUp(ephemeralTextContainer("畫面已過期，請以最新遊戲訊息為準"));
     return;
   }
   if (result.status === "forbidden") {
-    await interaction.followUp({ content: "只有這段生涯的擁有者可以操作。", flags: ephemeral });
+    await interaction.followUp(ephemeralTextContainer("只有這段生涯的擁有者可以操作"));
     return;
   }
   if (result.status === "inactive") {
-    await interaction.followUp({ content: "這段生涯已經結束或被放棄。", flags: ephemeral });
+    await interaction.followUp(ephemeralTextContainer("這段生涯已經結束或被放棄"));
     return;
   }
-  await interaction.followUp({ content: "找不到這段生涯，資料可能已刪除。", flags: ephemeral });
+  await interaction.followUp(ephemeralTextContainer("找不到這段生涯，資料可能已刪除"));
 }
 
 async function reportError(
@@ -280,16 +311,12 @@ async function reportError(
   const content =
     error instanceof DomainError || error instanceof ActiveCareerExistsError
       ? error.message
-      : "服務暫時無法使用；本次操作未消耗行動，請稍後再試。";
+      : "服務暫時無法使用；本次操作未消耗行動，請稍後再試";
   if (interaction.isRepliable()) {
     if (interaction.deferred || interaction.replied) {
-      await interaction
-        .followUp({ content, flags: ephemeral, allowedMentions: { parse: [] } })
-        .catch(() => undefined);
+      await interaction.followUp(ephemeralTextContainer(content)).catch(() => undefined);
     } else {
-      await interaction
-        .reply({ content, flags: ephemeral, allowedMentions: { parse: [] } })
-        .catch(() => undefined);
+      await interaction.reply(ephemeralTextContainer(content)).catch(() => undefined);
     }
   }
 }
