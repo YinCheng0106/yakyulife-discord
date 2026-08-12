@@ -85,4 +85,4 @@ bun run db:verify
 - runtime role 只有遊戲資料 DML 權限；migration 才能執行 DDL。
 - secrets 只放部署環境，不提交 `.env`。
 
-完整設計請見 `docs/ARCHITECTURE.md`，部署方式請見 `docs/DEPLOYMENT.md`，上游同步紀錄請見 `docs/UPSTREAM_SYNC.md`。
+部署方式請見 `docs/DEPLOYMENT.md`，上游同步紀錄請見 `docs/UPSTREAM_SYNC.md`。
