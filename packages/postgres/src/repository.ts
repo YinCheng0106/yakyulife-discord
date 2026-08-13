@@ -1,5 +1,7 @@
 import {
   ActiveCareerExistsError,
+  type CareerJournalEntry,
+  type CareerListItem,
   type CareerLocation,
   type CareerRecord,
   type CareerRepository,
@@ -28,6 +30,34 @@ interface CareerRow {
   created_at: Date | string;
   updated_at: Date | string;
   completed_at: Date | string | null;
+}
+
+interface JournalRow {
+  career_id: string;
+  state_revision: number | string;
+  ordinal: number | string;
+  game_year: number | string;
+  player_age: number | string;
+  category: CareerJournalEntry["category"];
+  tone: CareerJournalEntry["tone"];
+  title: string;
+  body: string;
+  created_at: Date | string;
+}
+
+function mapJournal(row: JournalRow): CareerJournalEntry {
+  return {
+    careerId: row.career_id,
+    stateRevision: Number(row.state_revision),
+    ordinal: Number(row.ordinal),
+    year: Number(row.game_year),
+    age: Number(row.player_age),
+    category: row.category,
+    tone: row.tone,
+    title: row.title,
+    body: row.body,
+    createdAt: toDate(row.created_at),
+  };
 }
 
 function toDate(value: Date | string): Date {
@@ -102,6 +132,17 @@ export class PostgresCareerRepository implements CareerRepository {
         );
         const row = rows[0];
         if (!row) throw new Error("Career insert returned no row");
+        for (const [ordinal, event] of (career.state.recentEvents ?? []).entries()) {
+          await tx`
+            insert into yakyulife.career_journal (
+              career_id, state_revision, ordinal, game_year, player_age,
+              category, tone, title, body
+            ) values (
+              ${career.id}, 0, ${ordinal}, ${event.year}, ${event.age},
+              ${event.category}, ${event.tone}, ${event.title}, ${event.body}
+            )
+          `;
+        }
         return mapCareer(row);
       });
     } catch (error) {
@@ -128,6 +169,54 @@ export class PostgresCareerRepository implements CareerRepository {
         select * from yakyulife.careers where id = ${careerId} limit 1
       `),
     );
+  }
+
+  public findOwnedById(careerId: string, discordUserId: string): Promise<CareerRecord | null> {
+    return this.withRuntimeRole(async (tx) =>
+      this.readOne(tx`
+        select * from yakyulife.careers
+        where id = ${careerId} and discord_user_id = ${discordUserId}
+        limit 1
+      `),
+    );
+  }
+
+  public listByUser(discordUserId: string, limit: number): Promise<CareerListItem[]> {
+    return this.withRuntimeRole(async (tx) => {
+      const rows = rowsOf<CareerRow>(
+        await tx`
+          select * from yakyulife.careers
+          where discord_user_id = ${discordUserId}
+          order by (status = 'active') desc, updated_at desc
+          limit ${limit}
+        `,
+      );
+      return rows.map((row) => {
+        const career = mapCareer(row);
+        return {
+          id: career.id,
+          name: career.state.name,
+          status: career.status,
+          startYear: career.state.seasons[0]?.year ?? 2026,
+          endYear: career.state.year,
+          updatedAt: career.updatedAt,
+        };
+      });
+    });
+  }
+
+  public listJournal(careerId: string, discordUserId: string): Promise<CareerJournalEntry[]> {
+    return this.withRuntimeRole(async (tx) => {
+      const rows = rowsOf<JournalRow>(
+        await tx`
+          select j.* from yakyulife.career_journal j
+          join yakyulife.careers c on c.id = j.career_id
+          where j.career_id = ${careerId} and c.discord_user_id = ${discordUserId}
+          order by j.state_revision, j.ordinal
+        `,
+      );
+      return rows.map(mapJournal);
+    });
   }
 
   public findLatestCompletedByUser(discordUserId: string): Promise<CareerRecord | null> {
@@ -200,6 +289,17 @@ export class PostgresCareerRepository implements CareerRepository {
           ${JSON.stringify(input.action)}::jsonb, ${career.stateRevision}, ${afterRevision}
         )
       `;
+      for (const [ordinal, event] of result.events.entries()) {
+        await tx`
+          insert into yakyulife.career_journal (
+            career_id, state_revision, ordinal, game_year, player_age,
+            category, tone, title, body
+          ) values (
+            ${career.id}, ${afterRevision}, ${ordinal}, ${event.year}, ${event.age},
+            ${event.category}, ${event.tone}, ${event.title}, ${event.body}
+          )
+        `;
+      }
       return { status: "applied", career: mapCareer(updated), events: result.events };
     });
   }

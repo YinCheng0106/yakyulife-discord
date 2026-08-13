@@ -1,4 +1,6 @@
 import type {
+  CareerJournalEntry,
+  CareerListItem,
   CareerLocation,
   CareerRecord,
   CareerState,
@@ -14,6 +16,9 @@ export interface CareerRepository {
   findActiveByUser(discordUserId: string): Promise<CareerRecord | null>;
   findLatestCompletedByUser(discordUserId: string): Promise<CareerRecord | null>;
   findById(careerId: string): Promise<CareerRecord | null>;
+  findOwnedById(careerId: string, discordUserId: string): Promise<CareerRecord | null>;
+  listByUser(discordUserId: string, limit: number): Promise<CareerListItem[]>;
+  listJournal(careerId: string, discordUserId: string): Promise<CareerJournalEntry[]>;
   commitAction(input: CommitActionInput, transition: CareerTransition): Promise<CommitActionResult>;
   updateLocation(careerId: string, discordUserId: string, location: CareerLocation): Promise<void>;
   abandon(careerId: string, discordUserId: string): Promise<boolean>;

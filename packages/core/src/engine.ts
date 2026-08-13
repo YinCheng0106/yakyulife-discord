@@ -5,6 +5,8 @@ import {
   abilityCost,
   CAREER_EVENTS,
   EFFORT_CONFIG,
+  LEAGUE_RULES,
+  LEAGUE_TEAMS,
   LEAGUE_THRESHOLDS,
   LEVEL_LABELS,
   overall,
@@ -17,8 +19,10 @@ import {
   type CareerState,
   type CareerSummary,
   ENGINE_VERSION,
+  type EngineEvent,
   type EngineResult,
   type GameAction,
+  LEGACY_ENGINE_VERSION,
   type LeagueLevel,
   type SeasonStats,
   STATE_SCHEMA_VERSION,
@@ -27,9 +31,12 @@ import {
 } from "./types.ts";
 
 const ABILITY_KEYS: readonly AbilityKey[] = ["stamina", "velocity", "control", "breaking"];
-const CPBL_TEAMS = ["台中猛瑪", "府城雄獅", "桃園金剛", "新北騎士", "台北恐龍", "高雄神鵰"];
 const HIGH_SCHOOLS = ["平鎮高中", "穀保家商", "高苑工商", "北科附工", "普門高中", "東大體中"];
 const UNIVERSITIES = ["北方大學", "府城大學", "海線體育大學", "首都科技大學"];
+
+function supportsExpandedCareer(state: CareerState): boolean {
+  return state.engineVersion === ENGINE_VERSION;
+}
 
 function emptyAbilities(): AbilitySet {
   return { stamina: 0, velocity: 0, control: 0, breaking: 0 };
@@ -86,7 +93,10 @@ function createTrainingDecision(state: CareerState): void {
     unlockTrait(state, "genius", events);
     state.lastOutcome.push(...events);
   }
-  state.pending = { type: "training", points: dice.reduce((sum, die) => sum + die, 0), dice };
+  state.pending =
+    state.engineVersion === LEGACY_ENGINE_VERSION
+      ? { type: "training", points: dice.reduce((sum, die) => sum + die, 0), dice }
+      : { type: "training", dice, assignments: [] };
 }
 
 function beginYear(state: CareerState): void {
@@ -95,11 +105,15 @@ function beginYear(state: CareerState): void {
   else createTrainingDecision(state);
 }
 
-export function createCareerState(name: string, seed: string): CareerState {
+export function createCareerState(
+  name: string,
+  seed: string,
+  engineVersion: string = ENGINE_VERSION,
+): CareerState {
   const normalizedSeed = seed.trim().slice(0, 24) || "yakyulife";
   const state: CareerState = {
-    schemaVersion: STATE_SCHEMA_VERSION,
-    engineVersion: ENGINE_VERSION,
+    schemaVersion: engineVersion === LEGACY_ENGINE_VERSION ? 1 : STATE_SCHEMA_VERSION,
+    engineVersion,
     upstreamCommit: UPSTREAM_COMMIT,
     seed: normalizedSeed,
     rngState: initialRngState(normalizedSeed),
@@ -155,6 +169,29 @@ export function createCareerState(name: string, seed: string): CareerState {
     lastOutcome: ["球員誕生｜從高中一年級展開投手生涯。"],
     summary: null,
   };
+  if (engineVersion !== LEGACY_ENGINE_VERSION) {
+    state.life = {
+      status: "single",
+      partner: null,
+      datingYears: 0,
+      marriedYears: 0,
+      children: 0,
+      formerPartners: [],
+      affairs: 0,
+      caughtAffairs: 0,
+    };
+    state.offseasonFatigue = 0;
+    state.recentEvents = [
+      {
+        year: state.year,
+        age: state.age,
+        category: "career",
+        tone: "good",
+        title: "球員誕生",
+        body: "從高中一年級展開投手生涯。",
+      },
+    ];
+  }
   for (const key of ABILITY_KEYS)
     state.abilities[key] += randomInt(state, 0, key === "velocity" ? 7 : 5);
   state.potential = rollPotential(state);
@@ -188,7 +225,9 @@ function allocateTraining(
 ): void {
   if (state.pending?.type !== "training") throw new DomainError("目前不是訓練階段");
   if (action.primary === action.secondary) throw new DomainError("主修與副修能力不可相同");
-  const points = state.pending.points;
+  if (state.engineVersion !== LEGACY_ENGINE_VERSION)
+    throw new DomainError("新版生涯必須逐顆分配訓練骰");
+  const points = state.pending.points ?? state.pending.dice.reduce((sum, die) => sum + die, 0);
   const primaryPoints = Math.ceil(points * 0.7);
   const secondaryPoints = points - primaryPoints;
   const primaryGain = spendTrainingPoints(state, action.primary, primaryPoints);
@@ -196,6 +235,92 @@ function allocateTraining(
   events.push(
     `季初特訓｜${points} 點分配至${ABILITY_LABELS[action.primary]}與${ABILITY_LABELS[action.secondary]}，能力分別提升 ${primaryGain}、${secondaryGain}。`,
   );
+  if (state.injury.rehabSeasons > 0) finishSeason(state, events, "rehab");
+  else {
+    const event = pick(state, CAREER_EVENTS);
+    state.pending = { type: "event", eventId: event.id };
+  }
+}
+
+function trainingDecision(state: CareerState) {
+  if (state.pending?.type !== "training") throw new DomainError("目前不是訓練階段");
+  if (state.engineVersion === LEGACY_ENGINE_VERSION)
+    throw new DomainError("舊版生涯不支援逐骰配點");
+  return state.pending;
+}
+
+function assignTrainingDie(
+  state: CareerState,
+  action: Extract<GameAction, { type: "assign_training_die" }>,
+  events: string[],
+): void {
+  const pending = trainingDecision(state);
+  const assignments = pending.assignments ?? [];
+  if (assignments.length >= pending.dice.length) throw new DomainError("所有訓練骰都已分配");
+  const preview = trainingPreview(state);
+  if (
+    preview.abilities[action.ability] >= 80 &&
+    !ABILITY_KEYS.every((key) => preview.abilities[key] >= 80)
+  )
+    throw new DomainError("這項能力已達上限，請選擇其他能力");
+  pending.assignments = [...assignments, action.ability];
+  const die = pending.dice[assignments.length];
+  events.push(
+    `訓練骰暫存｜將 ${die ?? 0} 點指派給${ABILITY_LABELS[action.ability]}，確認前仍可復原。`,
+  );
+}
+
+function undoTrainingDie(state: CareerState, events: string[]): void {
+  const pending = trainingDecision(state);
+  const assignments = pending.assignments ?? [];
+  const ability = assignments.at(-1);
+  if (!ability) throw new DomainError("目前沒有可復原的訓練骰");
+  pending.assignments = assignments.slice(0, -1);
+  events.push(`復原訓練骰｜取消上一顆對${ABILITY_LABELS[ability]}的指派。`);
+}
+
+export function trainingPreview(state: CareerState): {
+  abilities: AbilitySet;
+  carry: AbilitySet;
+  gains: AbilitySet;
+} {
+  const copy = structuredClone(state);
+  const pending = copy.pending;
+  const before = { ...copy.abilities };
+  if (pending?.type === "training") {
+    for (const [index, ability] of (pending.assignments ?? []).entries()) {
+      spendTrainingPoints(copy, ability, pending.dice[index] ?? 0);
+    }
+  }
+  return {
+    abilities: { ...copy.abilities },
+    carry: { ...copy.trainingCarry },
+    gains: {
+      stamina: copy.abilities.stamina - before.stamina,
+      velocity: copy.abilities.velocity - before.velocity,
+      control: copy.abilities.control - before.control,
+      breaking: copy.abilities.breaking - before.breaking,
+    },
+  };
+}
+
+function confirmTraining(state: CareerState, events: string[]): void {
+  const pending = trainingDecision(state);
+  const assignments = pending.assignments ?? [];
+  const allCapped = ABILITY_KEYS.every((key) => trainingPreview(state).abilities[key] >= 80);
+  if (assignments.length < pending.dice.length && !allCapped)
+    throw new DomainError("請先分配所有訓練骰");
+  const gains = emptyAbilities();
+  const spent = emptyAbilities();
+  for (const [index, ability] of assignments.entries()) {
+    const points = pending.dice[index] ?? 0;
+    spent[ability] += points;
+    gains[ability] += spendTrainingPoints(state, ability, points);
+  }
+  const details = ABILITY_KEYS.filter((key) => spent[key] > 0)
+    .map((key) => `${ABILITY_LABELS[key]} ${spent[key]} 點（能力 +${gains[key]}）`)
+    .join("、");
+  events.push(`季初特訓｜逐骰分配完成：${details || "能力已滿，剩餘骰子捨棄"}。`);
   if (state.injury.rehabSeasons > 0) finishSeason(state, events, "rehab");
   else {
     const event = pick(state, CAREER_EVENTS);
@@ -255,16 +380,20 @@ function chooseEvent(
 function injuryResult(state: CareerState): "none" | "minor" | "major" {
   const ageRisk = state.age >= 35 ? 12 : state.age >= 32 ? 6 : 0;
   const traitRisk = state.traits.fragile ? 18 : state.traits.iron_man ? -12 : 0;
-  const risk = clamp(24 + ageRisk + traitRisk + state.injury.temporaryPenalty, 4, 80);
+  const risk = clamp(
+    24 + ageRisk + traitRisk + state.injury.temporaryPenalty + (state.offseasonFatigue ?? 0),
+    4,
+    80,
+  );
   state.injury.temporaryPenalty = 0;
+  if (state.engineVersion !== LEGACY_ENGINE_VERSION) state.offseasonFatigue = 0;
   if (!chance(state, risk)) return "none";
   return chance(state, 24) ? "major" : "minor";
 }
 
 function currentLevelConfig(level: LeagueLevel): { games: number; par: number } {
-  if (level === "cpbl1") return { games: 120, par: 44 };
-  if (level === "cpbl2") return { games: 80, par: 34 };
-  return { games: 30, par: 32 };
+  const rule = LEAGUE_RULES[level];
+  return { games: rule.games, par: rule.par };
 }
 
 function simulateSeason(
@@ -301,11 +430,30 @@ function simulateSeason(
   const holds =
     role === "reliever" ? Math.round(games * clamp(0.28 + difference * 0.008, 0.1, 0.55)) : 0;
   const awards: string[] = [];
-  if (state.level === "cpbl1" && difference >= 8 && innings >= 80) awards.push("年度最佳投手");
-  if (state.level === "cpbl1" && strikeouts >= 150) awards.push("三振王");
-  if (state.level === "cpbl1" && saves >= 30) awards.push("救援王");
-  if (state.level === "cpbl1" && difference >= 4) awards.push("明星賽");
-  return {
+  if (state.engineVersion === LEGACY_ENGINE_VERSION) {
+    if (state.level === "cpbl1" && difference >= 8 && innings >= 80) awards.push("年度最佳投手");
+    if (state.level === "cpbl1" && strikeouts >= 150) awards.push("三振王");
+    if (state.level === "cpbl1" && saves >= 30) awards.push("救援王");
+    if (state.level === "cpbl1" && difference >= 4) awards.push("明星賽");
+  } else {
+    const topLevel = ![
+      "amateur",
+      "cpbl2",
+      "npb2",
+      "rookie",
+      "a",
+      "high_a",
+      "aa",
+      "aaa",
+      "kbo2",
+    ].includes(state.level);
+    if (topLevel && difference >= 8 && innings >= Math.min(80, config.games * 0.65))
+      awards.push("年度最佳投手");
+    if (topLevel && strikeouts >= Math.round(config.games * 1.1)) awards.push("三振王");
+    if (topLevel && saves >= Math.min(30, Math.round(config.games * 0.23))) awards.push("救援王");
+    if (topLevel && difference >= 4) awards.push("明星賽");
+  }
+  const base: SeasonStats = {
     year: state.year,
     age: state.age,
     level: state.level,
@@ -325,6 +473,16 @@ function simulateSeason(
     injured: injury,
     awards,
   };
+  if (state.engineVersion === LEGACY_ENGINE_VERSION) return base;
+  const league = LEAGUE_RULES[state.level].league;
+  return {
+    seasonId: `${state.year}-${league}-primary-${state.seasons.length + 1}`,
+    calendarYear: state.year,
+    seasonLabel: `${state.year} ${LEVEL_LABELS[state.level]}`,
+    league,
+    engagement: "primary",
+    ...base,
+  };
 }
 
 function applyAging(state: CareerState, events: string[]): void {
@@ -337,7 +495,9 @@ function applyAging(state: CareerState, events: string[]): void {
 
 function finishSeason(state: CareerState, events: string[], forced: "normal" | "rehab"): void {
   const injury = forced === "rehab" ? "rehab" : injuryResult(state);
-  if (injury === "major") {
+  if (injury === "rehab") {
+    events.push("整季復健｜受 TJ 手術影響，本季專注復健，不列出戰績資訊。");
+  } else if (injury === "major") {
     state.counters.majorInjuries += 1;
     state.counters.healthySeasons = 0;
     state.injury.rehabSeasons = chance(state, 50) ? 1 : 0;
@@ -364,9 +524,11 @@ function finishSeason(state: CareerState, events: string[], forced: "normal" | "
       EFFORT_CONFIG[state.pitchEffort].tjMultiplier;
     state.injury.tjLoad += tjBase * (state.injury.tjCount > 0 ? 1.15 : 1);
   }
-  events.push(
-    `${state.year} 球季｜${LEVEL_LABELS[state.level]} ${stats.games} 場、${stats.innings} 局、${stats.wins} 勝、${stats.saves} 救援、ERA ${stats.era.toFixed(1)}。`,
-  );
+  if (injury !== "major" && injury !== "rehab") {
+    events.push(
+      `${state.year} 球季｜${LEVEL_LABELS[state.level]} ${stats.games} 場、${stats.innings} 局、${stats.wins} 勝、${stats.saves} 救援、ERA ${stats.era.toFixed(1)}。`,
+    );
+  }
   if (stats.awards.length > 0) events.push(`本季榮譽｜${stats.awards.join("、")}。`);
 
   if (
@@ -386,28 +548,327 @@ function finishSeason(state: CareerState, events: string[], forced: "normal" | "
   const tjCap = state.traits.rubber_arm ? 100 : 50;
   if (state.stage === "professional" && state.injury.tjLoad >= tjCap)
     state.pending = { type: "tj" };
-  else resolvePostSeason(state, events);
+  else beginOffFieldPhase(state, events);
+}
+
+const PARTNER_NAMES = ["小葵", "若晴", "恩熙", "智雅", "艾蜜莉", "夏洛特"];
+
+function beginOffFieldPhase(state: CareerState, events: string[]): void {
+  if (!supportsExpandedCareer(state) || state.stage !== "professional" || !state.life) {
+    resolvePostSeason(state, events);
+    return;
+  }
+  if (state.age >= 20 && chance(state, 22)) {
+    const life = state.life;
+    const eventId =
+      life.status === "single" || life.status === "divorced"
+        ? "dating"
+        : life.status === "dating" && life.datingYears >= 2
+          ? "proposal"
+          : life.status === "married" && chance(state, 24)
+            ? "temptation"
+            : "anniversary";
+    state.pending = { type: "life", eventId };
+    return;
+  }
+  maybeOfferInternational(state, events);
+}
+
+function maybeOfferInternational(state: CareerState, events: string[]): void {
+  const classic = (state.year - 2026) % 4 === 0;
+  const premier = (state.year - 2028) % 4 === 0;
+  if (
+    supportsExpandedCareer(state) &&
+    state.stage === "professional" &&
+    (classic || premier) &&
+    overall(state) >= 50 &&
+    state.injury.rehabSeasons === 0
+  ) {
+    state.pending = {
+      type: "international",
+      tournament: classic ? "世界棒球經典賽" : "世界12強賽",
+      forced: state.age < 25,
+    };
+    return;
+  }
+  maybeOfferAbl(state, events);
+}
+
+function maybeOfferAbl(state: CareerState, events: string[]): void {
+  if (
+    supportsExpandedCareer(state) &&
+    state.stage === "professional" &&
+    state.level !== "abl" &&
+    state.age <= 36 &&
+    state.injury.rehabSeasons === 0 &&
+    chance(state, 18)
+  ) {
+    state.pending = { type: "abl", team: pick(state, LEAGUE_TEAMS.abl), mode: "offseason" };
+    return;
+  }
+  resolvePostSeason(state, events);
+}
+
+function chooseLife(
+  state: CareerState,
+  action: Extract<GameAction, { type: "choose_life" }>,
+  events: string[],
+): void {
+  if (state.pending?.type !== "life" || !state.life) throw new DomainError("目前沒有感情抉擇");
+  const eventId = state.pending.eventId;
+  const life = state.life;
+  if (eventId === "dating") {
+    if (action.choice === "accept") {
+      life.status = "dating";
+      life.partner = pick(state, PARTNER_NAMES);
+      life.datingYears = 0;
+      events.push(`場外緣分｜與${life.partner}開始交往，人生多了一位重要夥伴。`);
+    } else events.push("場外緣分｜選擇把注意力留在球場，婉拒了這段緣分。");
+  } else if (eventId === "proposal") {
+    if (action.choice === "accept") {
+      life.status = "married";
+      life.marriedYears = 0;
+      state.abilities.stamina = clamp(state.abilities.stamina + 1, 1, 80);
+      events.push(`婚禮｜與${life.partner ?? "伴侶"}完婚，安定生活讓體力 +1。`);
+    } else if (chance(state, 45)) {
+      if (life.partner) life.formerPartners.push(life.partner);
+      events.push(`分手｜婚期一再延後，${life.partner ?? "伴侶"}選擇離開。`);
+      life.status = "single";
+      life.partner = null;
+      life.datingYears = 0;
+    } else events.push("婚期延後｜兩人決定再給彼此一些時間。");
+  } else if (eventId === "temptation") {
+    if (action.choice === "bold") {
+      life.affairs += 1;
+      if (chance(state, 45)) {
+        life.caughtAffairs += 1;
+        if (life.partner) life.formerPartners.push(life.partner);
+        life.status = "divorced";
+        life.partner = null;
+        state.abilities.control = clamp(state.abilities.control - 3, 1, 80);
+        events.push("婚姻危機｜外遇曝光並以離婚收場，控球 -3。");
+      } else {
+        state.abilities.stamina = clamp(state.abilities.stamina + 1, 1, 80);
+        events.push("危險赴約｜暫時沒有曝光，但這個選擇已留在生涯紀錄中，體力 +1。");
+      }
+    } else {
+      state.abilities.control = clamp(state.abilities.control + 1, 1, 80);
+      events.push("守住承諾｜拒絕誘惑並專注家庭，控球 +1。");
+    }
+  } else {
+    if (action.choice === "accept") {
+      state.injury.temporaryPenalty = Math.max(0, state.injury.temporaryPenalty - 5);
+      if (life.status === "married" && chance(state, 25)) {
+        life.children += 1;
+        events.push(
+          `家庭新成員｜與${life.partner ?? "伴侶"}迎接第 ${life.children} 個孩子，下季傷病風險下降。`,
+        );
+      } else events.push(`家庭時光｜陪伴${life.partner ?? "家人"}度過重要日子，下季傷病風險下降。`);
+    } else {
+      state.abilities.velocity = clamp(state.abilities.velocity + 1, 1, 80);
+      events.push("加練優先｜錯過家庭時光換來訓練成果，球速 +1。");
+    }
+  }
+  maybeOfferInternational(state, events);
+}
+
+function simulateInternationalTournament(
+  state: CareerState,
+  tournament: "世界棒球經典賽" | "世界12強賽",
+): SeasonStats {
+  const previous = { level: state.level, team: state.team, role: state.role };
+  state.level = "international";
+  state.team = "中華隊";
+  const stats = simulateSeason(state, "none");
+  const resultRoll = overall(state) + randomInt(state, -12, 12);
+  const result =
+    resultRoll >= 68 ? "冠軍" : resultRoll >= 61 ? "四強" : resultRoll >= 54 ? "複賽" : "預賽";
+  if (result === "冠軍") stats.awards.push(`${tournament}冠軍`);
+  if (result === "四強") stats.awards.push(`${tournament}四強`);
+  stats.seasonId = `${state.year}-international-${state.seasons.length + 1}`;
+  stats.seasonLabel = `${state.year} ${tournament}｜${result}`;
+  stats.engagement = "offseason";
+  state.level = previous.level;
+  state.team = previous.team;
+  state.role = previous.role;
+  return stats;
+}
+
+function chooseInternational(
+  state: CareerState,
+  action: Extract<GameAction, { type: "choose_international" }>,
+  events: string[],
+): void {
+  if (state.pending?.type !== "international") throw new DomainError("目前沒有國際賽徵召");
+  const invitation = state.pending;
+  if (action.choice === "decline" && invitation.forced)
+    throw new DomainError("列管期間必須接受國家隊徵召");
+  if (action.choice === "accept") {
+    const stats = simulateInternationalTournament(state, invitation.tournament);
+    state.seasons.push(stats);
+    state.offseasonFatigue = (state.offseasonFatigue ?? 0) + 8;
+    state.honors.push(...stats.awards.map((award) => `${state.year} ${award}`));
+    events.push(
+      `國際賽徵召｜披上中華隊戰袍參加${invitation.tournament}，${stats.games} 場、${stats.innings} 局、${stats.strikeouts} K；結果記入生涯並增加下季疲勞。`,
+    );
+  } else events.push(`國際賽徵召｜婉拒${invitation.tournament}，留在母隊調整。`);
+  maybeOfferAbl(state, events);
+}
+
+function simulateAblOffseason(state: CareerState, team: string): SeasonStats {
+  const previous = { level: state.level, team: state.team, role: state.role };
+  state.level = "abl";
+  state.team = team;
+  const injured = chance(state, 8) ? "minor" : "none";
+  const stats = simulateSeason(state, injured);
+  stats.seasonId = `${state.year}-abl-offseason-${state.seasons.length + 1}`;
+  stats.seasonLabel = `${state.year}–${String(state.year + 1).slice(-2)} 澳職短期派遣`;
+  stats.engagement = "offseason";
+  state.level = previous.level;
+  state.team = previous.team;
+  state.role = previous.role;
+  return stats;
+}
+
+function chooseAbl(
+  state: CareerState,
+  action: Extract<GameAction, { type: "choose_abl" }>,
+  events: string[],
+): void {
+  if (state.pending?.type !== "abl") throw new DomainError("目前沒有澳職邀請");
+  const invitation = state.pending;
+  if (action.choice === "accept") {
+    const stats = simulateAblOffseason(state, invitation.team);
+    state.seasons.push(stats);
+    state.offseasonFatigue = (state.offseasonFatigue ?? 0) + 6;
+    if (stats.injured === "none") {
+      const key = pick(state, ABILITY_KEYS);
+      state.abilities[key] = clamp(state.abilities[key] + 1, 1, 80);
+      events.push(
+        `澳職派遣｜效力${invitation.team}，${stats.games} 場、${stats.innings} 局、ERA ${stats.era.toFixed(1)}；${ABILITY_LABELS[key]} +1，但下季疲勞上升。`,
+      );
+    } else events.push(`澳職派遣｜效力${invitation.team}期間出現小傷，下季疲勞與傷病風險上升。`);
+  } else events.push(`澳職邀請｜婉拒${invitation.team}的短期派遣，留在臺灣完整休養。`);
+  resolvePostSeason(state, events);
 }
 
 function advanceYear(state: CareerState, events: string[], incrementStageYear = false): void {
   state.year += 1;
   state.age += 1;
+  if (state.life?.status === "dating") state.life.datingYears += 1;
+  if (state.life?.status === "married") state.life.marriedYears += 1;
   if (incrementStageYear) state.stageYear += 1;
   applyAging(state, events);
   beginYear(state);
 }
 
-function contractOffers(
-  state: CareerState,
-): Array<{ kind: "long" | "short"; years: number; salary: number }> {
+function contractOffers(state: CareerState): Array<{
+  id?: string;
+  kind: "long" | "short" | "overseas";
+  years: number;
+  salary: number;
+  level?: LeagueLevel;
+  team?: string;
+  source?: "posting" | "fa" | "free_agent" | "injury_replacement" | "tryout";
+}> {
   const rating = overall(state);
-  const base = state.level === "cpbl1" ? 300 + Math.max(0, rating - 44) * 120 : 84;
   const ageCap = state.age >= 36 ? 2 : state.age >= 34 ? 3 : state.age >= 32 ? 5 : 7;
-  return [
-    { kind: "long", years: Math.min(ageCap, 4), salary: Math.round(base * 0.92) },
-    { kind: "short", years: Math.min(ageCap, 2), salary: Math.round(base * 1.12) },
+  if (state.engineVersion === LEGACY_ENGINE_VERSION) {
+    const legacyBase = state.level === "cpbl1" ? 300 + Math.max(0, rating - 44) * 120 : 84;
+    return [
+      { kind: "long", years: Math.min(ageCap, 4), salary: Math.round(legacyBase * 0.92) },
+      { kind: "short", years: Math.min(ageCap, 2), salary: Math.round(legacyBase * 1.12) },
+    ];
+  }
+  const rule = LEAGUE_RULES[state.level];
+  const base =
+    rule.baseSalary + Math.max(0, rating - rule.par) * Math.max(24, rule.baseSalary * 0.08);
+  const offers: Array<{
+    id: string;
+    kind: "long" | "short" | "overseas";
+    years: number;
+    salary: number;
+    level?: LeagueLevel;
+    team?: string;
+    source?: "posting" | "fa" | "free_agent" | "injury_replacement" | "tryout";
+  }> = [
+    {
+      id: "long",
+      kind: "long" as const,
+      years: Math.min(ageCap, 4),
+      salary: Math.round(base * 0.92),
+    },
+    {
+      id: "short",
+      kind: "short" as const,
+      years: Math.min(ageCap, 2),
+      salary: Math.round(base * 1.12),
+    },
   ];
+  if (!supportsExpandedCareer(state)) return offers;
+  const candidates: LeagueLevel[] = ["abl"];
+  if (rating >= 45) candidates.push("kbo2", "npb2");
+  if (rating >= 52) candidates.push("kbo1", "npb1");
+  if (rating >= 36) candidates.push("rookie");
+  if (rating >= 40) candidates.push("a");
+  if (rating >= 44) candidates.push("high_a");
+  if (rating >= 48) candidates.push("aa");
+  if (rating >= 54) candidates.push("aaa");
+  if (rating >= 62) candidates.push("mlb");
+  if (LEAGUE_RULES[state.level].league !== "cpbl") candidates.push("cpbl1");
+  const level = pick(
+    state,
+    candidates.filter((candidate) => LEAGUE_RULES[candidate].league !== rule.league),
+  );
+  const targetRule = LEAGUE_RULES[level];
+  const team = pick(state, LEAGUE_TEAMS[targetRule.league]);
+  const source =
+    state.contract.serviceYears >= 7
+      ? "fa"
+      : rating >= 58 && state.contract.serviceYears >= 3
+        ? "posting"
+        : state.age >= 34
+          ? "injury_replacement"
+          : rating < 48
+            ? "tryout"
+            : "free_agent";
+  offers.push({
+    id: "overseas",
+    kind: "overseas",
+    years:
+      source === "injury_replacement" || source === "tryout"
+        ? 1
+        : level === "abl"
+          ? Math.min(2, ageCap)
+          : Math.min(3, ageCap),
+    salary: Math.round(targetRule.baseSalary * (rating >= targetRule.par + 6 ? 1.45 : 1)),
+    level,
+    team,
+    source,
+  });
+  return offers;
 }
+
+const PROMOTION_LEVEL: Partial<Record<LeagueLevel, LeagueLevel>> = {
+  cpbl2: "cpbl1",
+  npb2: "npb1",
+  rookie: "a",
+  a: "high_a",
+  high_a: "aa",
+  aa: "aaa",
+  aaa: "mlb",
+  kbo2: "kbo1",
+};
+const DEMOTION_LEVEL: Partial<Record<LeagueLevel, LeagueLevel>> = {
+  cpbl1: "cpbl2",
+  npb1: "npb2",
+  a: "rookie",
+  high_a: "a",
+  aa: "high_a",
+  aaa: "aa",
+  mlb: "aaa",
+  kbo1: "kbo2",
+};
 
 function resolvePostSeason(state: CareerState, events: string[]): void {
   if (state.stage === "high_school") {
@@ -428,12 +889,24 @@ function resolvePostSeason(state: CareerState, events: string[]): void {
   state.contract.serviceYears += 1;
   state.contract.yearsRemaining = Math.max(0, state.contract.yearsRemaining - 1);
   const rating = overall(state);
-  if (state.level === "cpbl2" && rating >= LEAGUE_THRESHOLDS.cpbl1PromotionOverall) {
-    state.level = "cpbl1";
-    events.push("升上一軍｜球團將你登錄至中職一軍。 ");
-  } else if (state.level === "cpbl1" && rating < LEAGUE_THRESHOLDS.cpbl2DemotionOverall) {
-    state.level = "cpbl2";
-    events.push("下放二軍｜球團要求你重新找回狀態。 ");
+  const rule = LEAGUE_RULES[state.level];
+  const promoted = PROMOTION_LEVEL[state.level];
+  const demoted = DEMOTION_LEVEL[state.level];
+  if (promoted && rule.promotionOverall !== null && rating >= rule.promotionOverall) {
+    state.level = promoted;
+    events.push(`升上一軍｜球團將你登錄至${LEVEL_LABELS[promoted]}。`);
+  } else if (demoted && rule.demotionOverall !== null && rating < rule.demotionOverall) {
+    state.level = demoted;
+    events.push(`下放調整｜球團將你移至${LEVEL_LABELS[demoted]}重新找回狀態。`);
+  }
+  if (supportsExpandedCareer(state) && state.level !== "abl" && chance(state, 6)) {
+    const league = LEAGUE_RULES[state.level].league;
+    const destinations = LEAGUE_TEAMS[league].filter((team) => team !== state.team);
+    if (destinations.length > 0) {
+      const formerTeam = state.team;
+      state.team = pick(state, destinations);
+      events.push(`季後交易｜${formerTeam}將你交易至${state.team}，合約與聯盟年資延續。`);
+    }
   }
   if (state.age >= LEAGUE_THRESHOLDS.forcedRetirementAge) {
     retire(state, "身體到達極限，48 歲強制引退。", events);
@@ -495,7 +968,7 @@ function chooseDraft(
   state.stage = "professional";
   state.stageYear = 1;
   state.level = overall(state) >= 41 ? "cpbl1" : "cpbl2";
-  state.team = pick(state, CPBL_TEAMS);
+  state.team = pick(state, LEAGUE_TEAMS.cpbl);
   state.contract = {
     annualSalary: state.level === "cpbl1" ? 300 : 84,
     yearsRemaining: 2,
@@ -561,12 +1034,29 @@ function chooseContract(
     retire(state, "合約期滿後決定高掛球鞋。", events);
     return;
   }
-  const offer = state.pending.offers.find((candidate) => candidate.kind === action.choice);
+  const offer = state.pending.offers.find(
+    (candidate) => candidate.id === action.choice || candidate.kind === action.choice,
+  );
   if (!offer) throw new DomainError("找不到指定的合約");
   state.contract.annualSalary = offer.salary;
   state.contract.yearsRemaining = offer.years;
+  if (offer.level && offer.team) {
+    const from = `${state.team}／${LEVEL_LABELS[state.level]}`;
+    state.level = offer.level;
+    state.team = offer.team;
+    const sourceLabel = {
+      posting: "入札",
+      fa: "FA",
+      free_agent: "自由球員",
+      injury_replacement: "短期傷兵替補",
+      tryout: "測試合約",
+    }[offer.source ?? "free_agent"];
+    events.push(
+      `跨聯盟轉隊｜透過${sourceLabel}離開${from}，加盟${offer.team}，從${LEVEL_LABELS[offer.level]}展開新挑戰。`,
+    );
+  }
   events.push(
-    `完成續約｜選擇${action.choice === "long" ? "長約" : "短約"}，${offer.years} 年、年薪 ${offer.salary} 萬。`,
+    `完成簽約｜${offer.kind === "long" ? "長約" : offer.kind === "short" ? "短約" : offer.level && LEAGUE_RULES[offer.level].league === "cpbl" ? "返台合約" : "海外合約"}，${offer.years} 年、年薪 ${offer.salary} 萬。`,
   );
   if (state.age >= 36) state.pending = { type: "career" };
   else advanceYear(state, events);
@@ -574,13 +1064,14 @@ function chooseContract(
 
 function careerSummary(state: CareerState, ending: string): CareerSummary {
   const professionalSeasons = state.seasons.filter((season) => season.level !== "amateur");
+  const primarySeasons = professionalSeasons.filter((season) => season.engagement !== "offseason");
   const bestEraValues = professionalSeasons
     .filter((season) => season.innings >= 30)
     .map((season) => season.era);
-  return {
+  const summary: CareerSummary = {
     name: state.name,
     finalAge: state.age,
-    seasons: professionalSeasons.length,
+    seasons: primarySeasons.length,
     careerWins: professionalSeasons.reduce((sum, season) => sum + season.wins, 0),
     careerSaves: professionalSeasons.reduce((sum, season) => sum + season.saves, 0),
     careerStrikeouts: professionalSeasons.reduce((sum, season) => sum + season.strikeouts, 0),
@@ -595,6 +1086,40 @@ function careerSummary(state: CareerState, ending: string): CareerSummary {
     seed: state.seed,
     engineVersion: state.engineVersion,
   };
+  if (supportsExpandedCareer(state)) {
+    const totals = new Map<
+      NonNullable<CareerSummary["leagueTotals"]>[number]["league"],
+      NonNullable<CareerSummary["leagueTotals"]>[number]
+    >();
+    for (const season of professionalSeasons) {
+      const league = season.league ?? LEAGUE_RULES[season.level].league;
+      const current = totals.get(league) ?? {
+        league,
+        seasons: 0,
+        games: 0,
+        innings: 0,
+        wins: 0,
+        saves: 0,
+        strikeouts: 0,
+      };
+      current.seasons += 1;
+      current.games += season.games;
+      current.innings = round1(current.innings + season.innings);
+      current.wins += season.wins;
+      current.saves += season.saves;
+      current.strikeouts += season.strikeouts;
+      totals.set(league, current);
+    }
+    summary.leagueTotals = [...totals.values()];
+    if (state.life) {
+      summary.family = {
+        status: state.life.status,
+        partner: state.life.partner,
+        children: state.life.children,
+      };
+    }
+  }
+  return summary;
 }
 
 function retire(state: CareerState, ending: string, events: string[]): void {
@@ -625,6 +1150,15 @@ export function reduceCareer(source: CareerState, action: GameAction): EngineRes
     case "allocate_training":
       allocateTraining(state, action, events);
       break;
+    case "assign_training_die":
+      assignTrainingDie(state, action, events);
+      break;
+    case "undo_training_die":
+      undoTrainingDie(state, events);
+      break;
+    case "confirm_training":
+      confirmTraining(state, events);
+      break;
     case "choose_event":
       chooseEvent(state, action, events);
       break;
@@ -640,6 +1174,15 @@ export function reduceCareer(source: CareerState, action: GameAction): EngineRes
     case "choose_contract":
       chooseContract(state, action, events);
       break;
+    case "choose_life":
+      chooseLife(state, action, events);
+      break;
+    case "choose_abl":
+      chooseAbl(state, action, events);
+      break;
+    case "choose_international":
+      chooseInternational(state, action, events);
+      break;
     case "choose_career":
       chooseCareer(state, action, events);
       break;
@@ -647,5 +1190,37 @@ export function reduceCareer(source: CareerState, action: GameAction): EngineRes
       assertNever(action);
   }
   state.lastOutcome = events;
-  return { state, events };
+  const structuredEvents = events.map((message): EngineEvent => {
+    const [rawTitle, ...rest] = message.split("｜");
+    const title = rawTitle?.trim() || "生涯動態";
+    const body = rest.join("｜").trim() || message.trim();
+    const category = /傷|TJ|復健/.test(title)
+      ? "injury"
+      : /婚|家庭|緣分|分手|誘惑|赴約/.test(title)
+        ? "life"
+        : /合約|簽約|續約/.test(title)
+          ? "contract"
+          : /聯盟|澳職|國際|升上|下放|轉隊|選秀/.test(title)
+            ? "league"
+            : /球季|榮譽|獎/.test(title)
+              ? "season"
+              : /訓練|特訓|骰/.test(title)
+                ? "training"
+                : "career";
+    const tone = /失敗|受傷|報銷|離婚|下降|下放|落選/.test(message)
+      ? "bad"
+      : /解鎖|榮譽|冠軍|成功|升上|完婚/.test(message)
+        ? "good"
+        : "neutral";
+    return { year: source.year, age: source.age, category, tone, title, body };
+  });
+  const journalEvents = structuredEvents.filter(
+    (event) => event.title !== "訓練骰暫存" && event.title !== "復原訓練骰",
+  );
+  if (state.engineVersion !== LEGACY_ENGINE_VERSION) {
+    state.recentEvents = [...(source.recentEvents ?? []), ...journalEvents]
+      .filter((event) => event.year === source.year)
+      .slice(-3);
+  }
+  return { state, events: journalEvents };
 }

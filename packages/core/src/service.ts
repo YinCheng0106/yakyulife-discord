@@ -2,11 +2,15 @@ import { createCareerState, reduceCareer } from "./engine.ts";
 import { ActiveCareerExistsError, DomainError } from "./errors.ts";
 import type { CareerRepository, Clock, IdGenerator } from "./ports.ts";
 import {
+  type CareerHistory,
+  type CareerListItem,
   type CareerLocation,
   type CareerRecord,
+  CORE_ENGINE_VERSION,
   type CommitActionInput,
   type CommitActionResult,
   ENGINE_VERSION,
+  LEGACY_ENGINE_VERSION,
   type NewCareerInput,
   UPSTREAM_COMMIT,
 } from "./types.ts";
@@ -16,6 +20,7 @@ export class CareerService {
     private readonly repository: CareerRepository,
     private readonly clock: Clock,
     private readonly ids: IdGenerator,
+    private readonly newCareerEngineVersion: string = ENGINE_VERSION,
   ) {}
 
   public async start(input: NewCareerInput): Promise<CareerRecord> {
@@ -26,7 +31,13 @@ export class CareerService {
     const seed = input.seed.trim();
     if (seed.length > 24) throw new DomainError("種子碼最多 24 個字元");
     const now = this.clock.now();
-    const state = createCareerState(name, seed);
+    if (
+      ![LEGACY_ENGINE_VERSION, CORE_ENGINE_VERSION, ENGINE_VERSION].includes(
+        this.newCareerEngineVersion,
+      )
+    )
+      throw new DomainError("不支援的新生涯 engine 版本");
+    const state = createCareerState(name, seed, this.newCareerEngineVersion);
     return this.repository.create({
       id: this.ids.next(),
       discordUserId: input.discordUserId,
@@ -34,7 +45,7 @@ export class CareerService {
       playMode: input.playMode,
       location: input.location,
       seed: state.seed,
-      engineVersion: ENGINE_VERSION,
+      engineVersion: state.engineVersion,
       upstreamCommit: UPSTREAM_COMMIT,
       stateRevision: 0,
       state,
@@ -55,6 +66,27 @@ export class CareerService {
 
   public getById(careerId: string): Promise<CareerRecord | null> {
     return this.repository.findById(careerId);
+  }
+
+  public listCareers(discordUserId: string, limit = 25): Promise<CareerListItem[]> {
+    return this.repository.listByUser(discordUserId, Math.min(25, Math.max(1, limit)));
+  }
+
+  public async getHistory(discordUserId: string, careerId?: string): Promise<CareerHistory | null> {
+    const career = careerId
+      ? await this.repository.findOwnedById(careerId, discordUserId)
+      : ((await this.repository.findActiveByUser(discordUserId)) ??
+        (await this.repository.findLatestCompletedByUser(discordUserId)));
+    if (!career) return null;
+    const entries = await this.repository.listJournal(career.id, discordUserId);
+    const years = [
+      ...new Set([
+        career.state.year,
+        ...career.state.seasons.map((season) => season.calendarYear ?? season.year),
+        ...entries.map((entry) => entry.year),
+      ]),
+    ].sort((left, right) => left - right);
+    return { career, entries, years };
   }
 
   public applyAction(input: CommitActionInput): Promise<CommitActionResult> {

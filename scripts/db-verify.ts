@@ -15,6 +15,9 @@ const requiredStatements = [
   "force row level security",
   "create role yakyulife_runtime",
   "discord_interaction_id text not null unique",
+  "create table if not exists yakyulife.career_journal",
+  "references yakyulife.careers (id) on delete cascade",
+  "create extension if not exists pg_cron",
 ];
 for (const statement of requiredStatements) {
   if (!source.includes(statement)) throw new Error(`Migration invariant missing: ${statement}`);
@@ -32,7 +35,11 @@ if (databaseUrl) {
     where table_schema = 'yakyulife' order by table_name
   `;
   const names = rows.map((row) => row.table_name);
-  if (!names.includes("careers") || !names.includes("career_actions")) {
+  if (
+    !names.includes("careers") ||
+    !names.includes("career_actions") ||
+    !names.includes("career_journal")
+  ) {
     throw new Error(
       "Connected database does not have the expected tables; run bun run db:push first",
     );

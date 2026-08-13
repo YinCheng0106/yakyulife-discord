@@ -1,6 +1,6 @@
 # YaKyuLife Discord Bot
 
-YaKyuLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supabase PostgreSQL 製作的非營利投手生涯模擬 Bot。MVP 提供高中、大學選秀、中職二軍／一軍、訓練、年度事件、傷病、TJ、合約、FA、衰退、引退與 PNG 分享卡。
+YaKyuLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supabase PostgreSQL 製作的非營利投手生涯模擬 Bot。投手模式提供逐骰配點、高中與大學選秀、中職、日職、美職、韓職、澳職、國際賽、人生事件、傷病、TJ、合約、FA、衰退、逐年生涯紀錄、引退與 PNG 分享卡。
 
 本專案改編自 [LeoGGcat／YaKyuLife](https://github.com/LeoGGcat/yakyulife)，規則基準為 [`913cad27`](https://github.com/LeoGGcat/yakyulife/commit/913cad27db86bda79cbd53dc5666ab15d28c5d2d)，依 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 授權。這是獨立改作，不代表原作者背書，不得用於廣告、付費功能或其他商業用途。
 
@@ -55,6 +55,7 @@ Docker image 固定使用 `oven/bun:1.3.14`，並安裝 Noto CJK 字型以固定
 - `/career start mode:<dm|channel> name?:<1-10字> seed?:<1-24字>`
 - `/career continue`
 - `/career status`
+- `/career history career?:<autocomplete>`
 - `/career abandon`
 - `/career share`
 - `/career delete-data`
@@ -81,8 +82,12 @@ bun run db:verify
 - Discord User ID 是玩家識別，不使用 Supabase Auth。
 - `custom_id` 只帶 career ID、revision 與 action key；遊戲狀態一律從 repository 讀回。
 - action transaction 使用 row lock、revision check 與唯一 interaction ID。
+- 結構化生涯日誌與 action、state 在同一個 transaction 寫入。
 - `yakyulife` 是不列入 Data API 的私有 schema，`anon`／`authenticated` 無權存取。
 - runtime role 只有遊戲資料 DML 權限；migration 才能執行 DDL。
 - secrets 只放部署環境，不提交 `.env`。
+- 完成與進行中的生涯長期保存；放棄且 30 天未更新的生涯由 Supabase Cron 分批清除。
+
+`CAREER_ENGINE_VERSION` 控制新建立生涯使用的版本，可設為 `0.1.0`、`0.2.0` 或 `0.3.0`。既有生涯一律依自身 engine 版本繼續，不會在中途被轉換。
 
 部署方式請見 `docs/DEPLOYMENT.md`，上游同步紀錄請見 `docs/UPSTREAM_SYNC.md`。

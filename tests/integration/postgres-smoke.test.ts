@@ -13,7 +13,9 @@ liveTest("Supabase/Postgres private schema is available", async () => {
     select table_name from information_schema.tables
     where table_schema = 'yakyulife' order by table_name
   `;
-  expect(tables.map((row) => row.table_name)).toEqual(["career_actions", "careers"]);
+  expect(tables.map((row) => row.table_name)).toEqual(
+    expect.arrayContaining(["career_actions", "careers"]),
+  );
   const expectedState = createCareerState("JSONB 驗證", "live-jsonb");
   const jsonbRows = await sql<{ state: unknown }[]>`
     select ${JSON.stringify(expectedState)}::jsonb as state

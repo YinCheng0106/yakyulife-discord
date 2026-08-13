@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { CareerService, type Clock, type IdGenerator } from "@yakyulife/core";
+import {
+  CareerService,
+  type Clock,
+  type IdGenerator,
+  LEGACY_ENGINE_VERSION,
+} from "@yakyulife/core";
 import { InMemoryCareerRepository } from "../helpers/in-memory-repository.ts";
 
 const clock: Clock = { now: () => new Date("2026-08-12T00:00:00.000Z") };
@@ -21,7 +26,7 @@ describe("career service integration", () => {
       discordUserId: "123",
       interactionId: "interaction-1",
       expectedRevision: 0,
-      action: { type: "allocate_training", primary: "velocity", secondary: "control" } as const,
+      action: { type: "assign_training_die", ability: "velocity" } as const,
     };
     const applied = await service.applyAction(input);
     expect(applied.status).toBe("applied");
@@ -42,5 +47,46 @@ describe("career service integration", () => {
     };
     await service.start(input);
     expect(service.start(input)).rejects.toThrow("已有進行中的生涯");
+  });
+
+  test("lists owned careers and returns structured history", async () => {
+    const service = new CareerService(new InMemoryCareerRepository(), clock, ids);
+    const career = await service.start({
+      discordUserId: "history-user",
+      name: "年表投手",
+      seed: "history",
+      playMode: "dm",
+      location: { guildId: null, channelId: null, messageId: null },
+    });
+    await service.applyAction({
+      careerId: career.id,
+      discordUserId: "history-user",
+      interactionId: "history-action",
+      expectedRevision: 0,
+      action: { type: "assign_training_die", ability: "control" },
+    });
+    const list = await service.listCareers("history-user");
+    const history = await service.getHistory("history-user", career.id);
+    expect(list[0]?.name).toBe("年表投手");
+    expect(history?.entries.some((entry) => entry.title === "訓練骰暫存")).toBe(false);
+    expect(await service.getHistory("other-user", career.id)).toBeNull();
+  });
+
+  test("can keep creating legacy careers during a staged rollout", async () => {
+    const service = new CareerService(
+      new InMemoryCareerRepository(),
+      clock,
+      ids,
+      LEGACY_ENGINE_VERSION,
+    );
+    const career = await service.start({
+      discordUserId: "legacy-user",
+      name: "舊版投手",
+      seed: "legacy",
+      playMode: "dm",
+      location: { guildId: null, channelId: null, messageId: null },
+    });
+    expect(career.engineVersion).toBe(LEGACY_ENGINE_VERSION);
+    expect(career.state.pending?.type === "training" && career.state.pending.points).toBeNumber();
   });
 });

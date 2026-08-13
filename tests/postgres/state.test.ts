@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createCareerState } from "@yakyulife/core";
+import { createCareerState, LEGACY_ENGINE_VERSION } from "@yakyulife/core";
 import { parseCareerState } from "@yakyulife/postgres";
 
 describe("persisted state boundary", () => {
@@ -11,6 +11,11 @@ describe("persisted state boundary", () => {
   test("accepts Bun.SQL JSONB string results", () => {
     const state = createCareerState("字串邊界", "jsonb-string");
     expect(parseCareerState(JSON.stringify(state))).toEqual(state);
+  });
+
+  test("continues accepting legacy state without modern life fields", () => {
+    const state = createCareerState("舊版邊界", "state-v1", LEGACY_ENGINE_VERSION);
+    expect(parseCareerState(structuredClone(state))).toEqual(state);
   });
 
   test("rejects malformed JSON before it reaches the engine", () => {

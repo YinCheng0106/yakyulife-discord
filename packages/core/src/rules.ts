@@ -1,4 +1,11 @@
-import type { AbilityKey, CareerState, EventStrategy, PitchEffort } from "./types.ts";
+import type {
+  AbilityKey,
+  CareerState,
+  EventStrategy,
+  LeagueKey,
+  LeagueLevel,
+  PitchEffort,
+} from "./types.ts";
 
 export const ABILITY_LABELS: Record<AbilityKey, string> = {
   stamina: "體力",
@@ -11,7 +18,172 @@ export const LEVEL_LABELS = {
   amateur: "業餘",
   cpbl2: "中職二軍",
   cpbl1: "中職一軍",
+  npb2: "日職二軍",
+  npb1: "日職一軍",
+  rookie: "美職新人聯盟",
+  a: "小聯盟 1A",
+  high_a: "高階 1A",
+  aa: "小聯盟 2A",
+  aaa: "小聯盟 3A",
+  mlb: "大聯盟",
+  kbo2: "韓職二軍",
+  kbo1: "韓職一軍",
+  abl: "澳洲職棒",
+  international: "國際賽",
 } as const;
+
+export interface LeagueRule {
+  league: LeagueKey;
+  games: number;
+  par: number;
+  baseSalary: number;
+  promotionOverall: number | null;
+  demotionOverall: number | null;
+}
+
+export const LEAGUE_RULES: Record<LeagueLevel, LeagueRule> = {
+  amateur: {
+    league: "amateur",
+    games: 30,
+    par: 32,
+    baseSalary: 0,
+    promotionOverall: null,
+    demotionOverall: null,
+  },
+  cpbl2: {
+    league: "cpbl",
+    games: 80,
+    par: 34,
+    baseSalary: 84,
+    promotionOverall: 41,
+    demotionOverall: null,
+  },
+  cpbl1: {
+    league: "cpbl",
+    games: 120,
+    par: 44,
+    baseSalary: 300,
+    promotionOverall: null,
+    demotionOverall: 39,
+  },
+  npb2: {
+    league: "npb",
+    games: 110,
+    par: 45,
+    baseSalary: 720,
+    promotionOverall: 53,
+    demotionOverall: null,
+  },
+  npb1: {
+    league: "npb",
+    games: 143,
+    par: 54,
+    baseSalary: 2_400,
+    promotionOverall: null,
+    demotionOverall: 49,
+  },
+  rookie: {
+    league: "mlb",
+    games: 60,
+    par: 34,
+    baseSalary: 180,
+    promotionOverall: 38,
+    demotionOverall: null,
+  },
+  a: {
+    league: "mlb",
+    games: 132,
+    par: 39,
+    baseSalary: 300,
+    promotionOverall: 43,
+    demotionOverall: 33,
+  },
+  high_a: {
+    league: "mlb",
+    games: 132,
+    par: 44,
+    baseSalary: 420,
+    promotionOverall: 48,
+    demotionOverall: 38,
+  },
+  aa: {
+    league: "mlb",
+    games: 138,
+    par: 49,
+    baseSalary: 600,
+    promotionOverall: 54,
+    demotionOverall: 43,
+  },
+  aaa: {
+    league: "mlb",
+    games: 150,
+    par: 53,
+    baseSalary: 1_200,
+    promotionOverall: 61,
+    demotionOverall: 48,
+  },
+  mlb: {
+    league: "mlb",
+    games: 162,
+    par: 63,
+    baseSalary: 24_000,
+    promotionOverall: null,
+    demotionOverall: 56,
+  },
+  kbo2: {
+    league: "kbo",
+    games: 118,
+    par: 43,
+    baseSalary: 600,
+    promotionOverall: 50,
+    demotionOverall: null,
+  },
+  kbo1: {
+    league: "kbo",
+    games: 144,
+    par: 51,
+    baseSalary: 1_800,
+    promotionOverall: null,
+    demotionOverall: 46,
+  },
+  abl: {
+    league: "abl",
+    games: 39,
+    par: 40,
+    baseSalary: 180,
+    promotionOverall: null,
+    demotionOverall: null,
+  },
+  international: {
+    league: "international",
+    games: 8,
+    par: 54,
+    baseSalary: 0,
+    promotionOverall: null,
+    demotionOverall: null,
+  },
+};
+
+export const LEAGUE_TEAMS: Record<LeagueKey, readonly string[]> = {
+  amateur: [],
+  cpbl: ["台中猛瑪", "府城雄獅", "桃園金剛", "新北騎士", "台北恐龍", "高雄神鵰"],
+  npb: ["東京白鷺", "大阪烈牛", "北海道雪狐", "福岡海星", "名古屋金鯱", "仙台青葉"],
+  mlb: ["紐約自由鳥", "洛杉磯星艦", "西雅圖逆戟鯨", "芝加哥風暴", "德州長角", "波士頓茶船"],
+  kbo: [
+    "首爾彗星",
+    "首爾守衛",
+    "仁川海風",
+    "水原白鹿",
+    "大田火箭",
+    "大邱火鳥",
+    "光州閃電",
+    "釜山鯨群",
+    "昌原機械人",
+    "清州山貓",
+  ],
+  abl: ["雪梨灣鯊", "布里斯本笑翠鳥", "阿德雷德袋鼠", "伯斯沙暴"],
+  international: ["中華隊"],
+};
 
 export const ROLE_LABELS = {
   starter: "先發",

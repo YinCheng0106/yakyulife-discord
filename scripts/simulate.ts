@@ -18,8 +18,9 @@ for (let index = 0; index < count; index += 1) {
 actionCounts.sort((left, right) => left - right);
 const median = actionCounts[Math.floor(actionCounts.length / 2)] ?? 0;
 const maximum = actionCounts.at(-1) ?? 0;
-if (maximum > 100) throw new Error(`Simulation exceeded action limit: ${maximum}`);
-if (median > 60) throw new Error(`Median interaction count exceeds target: ${median}`);
+if (maximum > 250) throw new Error(`Simulation exceeded action limit: ${maximum}`);
+if (median < 80 || median > 180)
+  throw new Error(`Median interaction count is outside the target band: ${median}`);
 logger.success(
   JSON.stringify(
     { careers: count, medianActions: median, maxActions: maximum, professionalCareers },

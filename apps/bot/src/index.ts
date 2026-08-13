@@ -10,7 +10,12 @@ const config = loadConfig();
 const logger = createLogger(config.logLevel);
 const sql = new SQL(config.databaseUrl, { max: 10, idleTimeout: 30, connectionTimeout: 10 });
 const repository = new PostgresCareerRepository(sql);
-const careerService = new CareerService(repository, systemClock, cryptoIdGenerator);
+const careerService = new CareerService(
+  repository,
+  systemClock,
+  cryptoIdGenerator,
+  config.careerEngineVersion,
+);
 const feature = createCareerFeature({
   careerService,
   logger,
@@ -40,7 +45,12 @@ const server = Bun.serve({
     const url = new URL(request.url);
     if (url.pathname === "/health") {
       return Response.json(
-        { ok: client.isReady(), service: "yakyulife-discord", version: "0.1.0" },
+        {
+          ok: client.isReady(),
+          service: "yakyulife-discord",
+          version: "0.3.0",
+          careerEngine: config.careerEngineVersion,
+        },
         {
           status: client.isReady() ? 200 : 503,
         },

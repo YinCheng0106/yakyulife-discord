@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "bun --watch apps/bot/src/index.ts",
     "start": "bun dist/bot.js",
-    "build": "bun build apps/bot/src/index.ts --target=bun --outdir=dist --entry-naming=bot.js --sourcemap=linked",
+    "build": "bun build apps/bot/src/index.ts --target=bun --outdir=dist --entry-naming=bot.js --sourcemap=linked --external sharp",
     "test": "bun test packages tests",
     "test:integration": "bun test tests/integration",
     "test:simulation": "bun run scripts/simulate.ts",

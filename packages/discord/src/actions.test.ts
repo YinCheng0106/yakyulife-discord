@@ -7,6 +7,17 @@ describe("career component IDs", () => {
     const value = toCustomId(careerId, 7, "event_bold");
     expect(parseCareerCustomId(value)).toEqual({ careerId, revision: 7, actionKey: "event_bold" });
     expect(actionFromKey("event_bold")).toEqual({ type: "choose_event", strategy: "bold" });
+    expect(actionFromKey("die_control")).toEqual({
+      type: "assign_training_die",
+      ability: "control",
+    });
+    expect(actionFromKey("training_undo")).toEqual({ type: "undo_training_die" });
+    expect(actionFromKey("training_confirm")).toEqual({ type: "confirm_training" });
+    expect(actionFromKey("abl_accept")).toEqual({ type: "choose_abl", choice: "accept" });
+    expect(actionFromKey("international_accept")).toEqual({
+      type: "choose_international",
+      choice: "accept",
+    });
   });
 
   test("rejects malformed values", () => {

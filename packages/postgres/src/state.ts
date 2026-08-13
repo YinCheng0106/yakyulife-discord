@@ -34,7 +34,14 @@ function validPending(value: unknown): boolean {
   if (!isRecord(value) || typeof value.type !== "string") return false;
   if (value.type === "training") {
     return (
-      isFiniteNumber(value.points) && Array.isArray(value.dice) && value.dice.every(isFiniteNumber)
+      (value.points === undefined || isFiniteNumber(value.points)) &&
+      Array.isArray(value.dice) &&
+      value.dice.every(isFiniteNumber) &&
+      (value.assignments === undefined ||
+        (Array.isArray(value.assignments) &&
+          value.assignments.every((item) =>
+            ["stamina", "velocity", "control", "breaking"].includes(String(item)),
+          )))
     );
   }
   if (value.type === "event") return typeof value.eventId === "string";
@@ -53,13 +60,54 @@ function validPending(value: unknown): boolean {
       value.offers.every(
         (offer) =>
           isRecord(offer) &&
-          (offer.kind === "long" || offer.kind === "short") &&
+          (offer.kind === "long" || offer.kind === "short" || offer.kind === "overseas") &&
           isFiniteNumber(offer.years) &&
           isFiniteNumber(offer.salary),
       )
     );
   }
+  if (value.type === "life")
+    return ["dating", "proposal", "anniversary", "temptation", "reconcile"].includes(
+      String(value.eventId),
+    );
+  if (value.type === "abl")
+    return (
+      typeof value.team === "string" && (value.mode === "offseason" || value.mode === "contract")
+    );
+  if (value.type === "international")
+    return (
+      (value.tournament === "世界棒球經典賽" || value.tournament === "世界12強賽") &&
+      typeof value.forced === "boolean"
+    );
   return false;
+}
+
+function validEngineEvent(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.year) &&
+    isFiniteNumber(value.age) &&
+    typeof value.category === "string" &&
+    typeof value.tone === "string" &&
+    typeof value.title === "string" &&
+    typeof value.body === "string"
+  );
+}
+
+function validLife(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    ["single", "dating", "married", "divorced"].includes(String(value.status)) &&
+    (value.partner === null || typeof value.partner === "string") &&
+    hasFiniteNumbers(value, [
+      "datingYears",
+      "marriedYears",
+      "children",
+      "affairs",
+      "caughtAffairs",
+    ]) &&
+    isStringArray(value.formerPartners)
+  );
 }
 
 function validSeason(value: unknown): boolean {
@@ -108,7 +156,24 @@ export function parseCareerSummary(value: unknown): CareerSummary | null {
     ]) ||
     !(decoded.bestEra === null || isFiniteNumber(decoded.bestEra)) ||
     !isStringArray(decoded.honors) ||
-    !isStringArray(decoded.traits)
+    !isStringArray(decoded.traits) ||
+    !(
+      decoded.leagueTotals === undefined ||
+      (Array.isArray(decoded.leagueTotals) &&
+        decoded.leagueTotals.every(
+          (total) =>
+            isRecord(total) &&
+            typeof total.league === "string" &&
+            hasFiniteNumbers(total, ["seasons", "games", "innings", "wins", "saves", "strikeouts"]),
+        ))
+    ) ||
+    !(
+      decoded.family === undefined ||
+      (isRecord(decoded.family) &&
+        ["single", "dating", "married", "divorced"].includes(String(decoded.family.status)) &&
+        (decoded.family.partner === null || typeof decoded.family.partner === "string") &&
+        isFiniteNumber(decoded.family.children))
+    )
   ) {
     throw new Error("Career summary is invalid");
   }
@@ -118,7 +183,7 @@ export function parseCareerSummary(value: unknown): CareerSummary | null {
 export function migrateCareerState(value: unknown): CareerState {
   const decoded = decodeJsonValue(value, "Career state");
   if (!isRecord(decoded)) throw new Error("Career state must be an object");
-  if (decoded.schemaVersion !== STATE_SCHEMA_VERSION) {
+  if (![1, 2, STATE_SCHEMA_VERSION].includes(Number(decoded.schemaVersion))) {
     throw new Error(`Unsupported career state schema: ${String(decoded.schemaVersion)}`);
   }
   const valid =
@@ -164,7 +229,12 @@ export function migrateCareerState(value: unknown): CareerState {
     decoded.seasons.every(validSeason) &&
     isStringArray(decoded.honors) &&
     isStringArray(decoded.lastOutcome) &&
-    validPending(decoded.pending);
+    validPending(decoded.pending) &&
+    (decoded.schemaVersion === 1 ||
+      (validLife(decoded.life) &&
+        isFiniteNumber(decoded.offseasonFatigue) &&
+        Array.isArray(decoded.recentEvents) &&
+        decoded.recentEvents.every(validEngineEvent)));
   if (!valid) throw new Error("Career state structure is invalid");
   parseCareerSummary(decoded.summary);
   return decoded as unknown as CareerState;

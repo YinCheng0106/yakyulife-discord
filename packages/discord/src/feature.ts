@@ -11,6 +11,7 @@ import {
 import {
   type APIContainerComponent,
   AttachmentBuilder,
+  type AutocompleteInteraction,
   type ButtonInteraction,
   type ChatInputCommandInteraction,
   ContainerBuilder,
@@ -23,8 +24,13 @@ import {
 import { actionFromKey, parseCareerCustomId } from "./actions.ts";
 import { ATTRIBUTION } from "./attribution.ts";
 import { careerCommands } from "./commands.ts";
-import { renderCareer } from "./render.ts";
-import type { ShareCardRenderer } from "./share-card.ts";
+import {
+  parseHistoryCustomId,
+  renderCareer,
+  renderCareerHistory,
+  renderCareerShare,
+} from "./render.ts";
+import { type ShareCardRenderer, shareCardFilename } from "./share-card.ts";
 
 export interface CareerFeature {
   commands: readonly RESTPostAPIApplicationCommandsJSONBody[];
@@ -140,7 +146,7 @@ async function handleStart(
       channelId: dm.id,
       messageId: message.id,
     });
-    await interaction.editReply(textContainer("已在私訊中開啟投手生涯。"));
+    await interaction.editReply(textContainer("已在私訊中開啟投手生涯"));
     return;
   }
 
@@ -215,6 +221,53 @@ async function handleStatus(
   );
 }
 
+async function handleHistory(
+  interaction: ChatInputCommandInteraction,
+  dependencies: CareerFeatureDependencies,
+): Promise<void> {
+  await interaction.deferReply({ flags: ephemeral });
+  const selected = interaction.options.getString("career") ?? undefined;
+  const history = await dependencies.careerService.getHistory(interaction.user.id, selected);
+  if (!history) {
+    await interaction.editReply(textContainer("找不到可查看的生涯紀錄"));
+    return;
+  }
+  if (!history.career.summary) {
+    await interaction.editReply(renderCareerHistory(history, history.years.length - 1));
+    return;
+  }
+  const filename = shareCardFilename(history.career.id);
+  const png = await dependencies.shareCardRenderer.render(history.career);
+  await interaction.editReply({
+    ...renderCareerHistory(history, history.years.length - 1, filename),
+    files: [new AttachmentBuilder(png, { name: filename })],
+  });
+}
+
+async function handleAutocomplete(
+  interaction: AutocompleteInteraction,
+  service: CareerService,
+): Promise<void> {
+  const focused = interaction.options.getFocused().toLocaleLowerCase("zh-TW");
+  const careers = await service.listCareers(interaction.user.id);
+  await interaction.respond(
+    careers
+      .filter((career) =>
+        `${career.name} ${career.id.slice(0, 8)} ${career.startYear} ${career.endYear}`
+          .toLocaleLowerCase("zh-TW")
+          .includes(focused),
+      )
+      .slice(0, 25)
+      .map((career) => ({
+        name: `${career.name}｜${career.startYear}–${career.endYear}｜${career.status === "active" ? "進行中" : career.status === "completed" ? "已完成" : "已放棄"}｜${career.id.slice(0, 8)}`.slice(
+          0,
+          100,
+        ),
+        value: career.id,
+      })),
+  );
+}
+
 async function handleCommand(
   interaction: ChatInputCommandInteraction,
   dependencies: CareerFeatureDependencies,
@@ -223,6 +276,7 @@ async function handleCommand(
   if (subcommand === "start") return handleStart(interaction, dependencies.careerService);
   if (subcommand === "continue") return handleContinue(interaction, dependencies.careerService);
   if (subcommand === "status") return handleStatus(interaction, dependencies.careerService);
+  if (subcommand === "history") return handleHistory(interaction, dependencies);
   if (subcommand === "abandon") {
     await interaction.deferReply({ flags: ephemeral });
     const active = await dependencies.careerService.getActive(interaction.user.id);
@@ -250,9 +304,10 @@ async function handleCommand(
       return;
     }
     const png = await dependencies.shareCardRenderer.render(career);
+    const filename = shareCardFilename(career.id);
     await interaction.editReply({
-      ...textContainer(ATTRIBUTION),
-      files: [new AttachmentBuilder(png, { name: `yakyulife-${career.id}.png` })],
+      ...renderCareerShare(filename, career.state.name),
+      files: [new AttachmentBuilder(png, { name: filename })],
     });
     return;
   }
@@ -302,6 +357,27 @@ async function handleButton(
   await interaction.followUp(ephemeralTextContainer("找不到這段生涯，資料可能已刪除"));
 }
 
+async function handleHistoryButton(
+  interaction: ButtonInteraction,
+  dependencies: CareerFeatureDependencies,
+): Promise<void> {
+  const parsed = parseHistoryCustomId(interaction.customId);
+  if (!parsed) return;
+  await interaction.deferUpdate();
+  const history = await dependencies.careerService.getHistory(interaction.user.id, parsed.careerId);
+  if (!history) {
+    await interaction.followUp(ephemeralTextContainer("找不到這段生涯，或你沒有查看權限"));
+    return;
+  }
+  await interaction.editReply(
+    renderCareerHistory(
+      history,
+      parsed.page,
+      history.career.summary ? shareCardFilename(history.career.id) : undefined,
+    ),
+  );
+}
+
 async function reportError(
   interaction: Interaction,
   error: unknown,
@@ -325,12 +401,19 @@ export function createCareerFeature(dependencies: CareerFeatureDependencies): Ca
   return {
     commands: careerCommands,
     async handleInteraction(interaction) {
+      const isCareerAutocomplete =
+        interaction.isAutocomplete() && interaction.commandName === "career";
       const isCareerCommand =
         interaction.isChatInputCommand() && interaction.commandName === "career";
       const isCareerButton = interaction.isButton() && interaction.customId.startsWith("career:");
-      if (!isCareerCommand && !isCareerButton) return false;
+      const isHistoryButton =
+        interaction.isButton() && interaction.customId.startsWith("career-history:");
+      if (!isCareerAutocomplete && !isCareerCommand && !isCareerButton && !isHistoryButton)
+        return false;
       try {
-        if (isCareerCommand) await handleCommand(interaction, dependencies);
+        if (isCareerAutocomplete) await handleAutocomplete(interaction, dependencies.careerService);
+        else if (isCareerCommand) await handleCommand(interaction, dependencies);
+        else if (isHistoryButton) await handleHistoryButton(interaction, dependencies);
         else if (isCareerButton) await handleButton(interaction, dependencies);
       } catch (error) {
         await reportError(interaction, error, dependencies.logger);

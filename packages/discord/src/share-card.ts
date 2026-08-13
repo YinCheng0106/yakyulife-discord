@@ -6,6 +6,10 @@ export interface ShareCardRenderer {
   render(career: CareerRecord): Promise<Buffer>;
 }
 
+export function shareCardFilename(careerId: string): string {
+  return `yakyulife-${careerId}.png`;
+}
+
 function escapeXml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
