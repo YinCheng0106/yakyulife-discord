@@ -4,12 +4,12 @@ export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] =
   new SlashCommandBuilder()
     .setName("career")
     .setNameLocalizations({ "zh-TW": "生涯" })
-    .setDescription("開始或管理 YaKyuLife 投手生涯")
+    .setDescription("開始或管理 YaKyuLife 棒球生涯")
     .addSubcommand((command) =>
       command
         .setName("start")
         .setNameLocalizations({ "zh-TW": "開始" })
-        .setDescription("開始新的投手生涯")
+        .setDescription("開始新的棒球生涯")
         .addStringOption((option) =>
           option
             .setName("mode")
@@ -17,6 +17,19 @@ export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] =
             .setDescription("遊戲訊息顯示位置")
             .setRequired(true)
             .addChoices({ name: "私訊", value: "dm" }, { name: "目前頻道", value: "channel" }),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("position")
+            .setNameLocalizations({ "zh-TW": "守位" })
+            .setDescription("生涯守位類別")
+            .setRequired(true)
+            .addChoices(
+              { name: "投手", value: "pitcher" },
+              { name: "捕手", value: "catcher" },
+              { name: "內野手", value: "infielder" },
+              { name: "外野手", value: "outfielder" },
+            ),
         )
         .addStringOption((option) =>
           option
@@ -33,6 +46,72 @@ export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] =
             .setDescription("重播種子（1–24 字）")
             .setMinLength(1)
             .setMaxLength(24),
+        ),
+    )
+    .addSubcommandGroup((group) =>
+      group
+        .setName("salary-duel")
+        .setNameLocalizations({ "zh-TW": "薪資對決" })
+        .setDescription("建立或加入同種子薪資好友賽")
+        .addSubcommand((command) =>
+          command
+            .setName("create")
+            .setNameLocalizations({ "zh-TW": "建立" })
+            .setDescription("建立 24 小時有效的好友賽邀請碼")
+            .addStringOption((option) =>
+              option
+                .setName("position")
+                .setDescription("雙方守位類別")
+                .setRequired(true)
+                .addChoices(
+                  { name: "投手", value: "pitcher" },
+                  { name: "捕手", value: "catcher" },
+                  { name: "內野手", value: "infielder" },
+                  { name: "外野手", value: "outfielder" },
+                ),
+            )
+            .addStringOption((option) =>
+              option
+                .setName("player-name")
+                .setDescription("球員姓名")
+                .setRequired(true)
+                .setMinLength(1)
+                .setMaxLength(10),
+            ),
+        )
+        .addSubcommand((command) =>
+          command
+            .setName("join")
+            .setNameLocalizations({ "zh-TW": "加入" })
+            .setDescription("使用邀請碼加入好友賽")
+            .addStringOption((option) =>
+              option
+                .setName("code")
+                .setDescription("12 字元邀請碼")
+                .setRequired(true)
+                .setMinLength(12)
+                .setMaxLength(12),
+            )
+            .addStringOption((option) =>
+              option
+                .setName("player-name")
+                .setDescription("球員姓名")
+                .setRequired(true)
+                .setMinLength(1)
+                .setMaxLength(10),
+            ),
+        )
+        .addSubcommand((command) =>
+          command
+            .setName("status")
+            .setNameLocalizations({ "zh-TW": "狀態" })
+            .setDescription("查看目前好友賽狀態"),
+        )
+        .addSubcommand((command) =>
+          command
+            .setName("cancel")
+            .setNameLocalizations({ "zh-TW": "取消" })
+            .setDescription("取消尚未開始的邀請"),
         ),
     )
     .addSubcommand((command) =>

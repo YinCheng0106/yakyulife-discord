@@ -1,5 +1,15 @@
-import { CareerService, cryptoIdGenerator, systemClock } from "@yakyulife/core";
-import { createCareerFeature, sharpShareCardRenderer } from "@yakyulife/discord";
+import {
+  CareerService,
+  cryptoIdGenerator,
+  ENGINE_VERSION,
+  SalaryDuelService,
+  systemClock,
+} from "@yakyulife/core";
+import {
+  createCareerFeature,
+  deliverPendingSalaryDuelResults,
+  sharpShareCardRenderer,
+} from "@yakyulife/discord";
 import { PostgresCareerRepository } from "@yakyulife/postgres";
 import { SQL } from "bun";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
@@ -16,10 +26,12 @@ const careerService = new CareerService(
   cryptoIdGenerator,
   config.careerEngineVersion,
 );
+const salaryDuelService = new SalaryDuelService(repository, systemClock, cryptoIdGenerator);
 const feature = createCareerFeature({
   careerService,
   logger,
   shareCardRenderer: sharpShareCardRenderer,
+  salaryDuelService,
 });
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.DirectMessages],
@@ -39,6 +51,23 @@ client.on(Events.Warn, (message) => logger.warn("Discord client warning", { mess
 await sql`select 1 as healthy`;
 await client.login(config.discordToken);
 
+async function maintainSalaryDuels(): Promise<void> {
+  try {
+    await salaryDuelService.maintain();
+    await deliverPendingSalaryDuelResults(
+      client,
+      salaryDuelService,
+      sharpShareCardRenderer,
+      logger,
+    );
+  } catch (error) {
+    logger.error("Salary duel maintenance failed", error);
+  }
+}
+
+await maintainSalaryDuels();
+const salaryDuelMaintenance = setInterval(() => void maintainSalaryDuels(), 15 * 60 * 1000);
+
 const server = Bun.serve({
   port: config.port,
   fetch(request) {
@@ -48,7 +77,7 @@ const server = Bun.serve({
         {
           ok: client.isReady(),
           service: "yakyulife-discord",
-          version: "0.3.0",
+          version: ENGINE_VERSION,
           careerEngine: config.careerEngineVersion,
         },
         {
@@ -65,6 +94,7 @@ let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(salaryDuelMaintenance);
   logger.info("Shutting down", { signal });
   await server.stop(false);
   client.destroy();

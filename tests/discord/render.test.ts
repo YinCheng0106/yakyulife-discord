@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { type CareerHistory, type CareerRecord, createCareerState } from "@yakyulife/core";
+import {
+  type CareerHistory,
+  type CareerRecord,
+  createCareerState,
+  type SalaryDuel,
+} from "@yakyulife/core";
 import {
   ATTRIBUTION,
+  createShareCardViewModel,
   parseHistoryCustomId,
   renderCareer,
   renderCareerHistory,
@@ -10,6 +16,7 @@ import {
   sharpShareCardRenderer,
   toHistoryCustomId,
 } from "@yakyulife/discord";
+import sharp from "sharp";
 import { runCareer } from "../helpers/simulation.ts";
 
 function record(state = createCareerState("畫面投手", "render")): CareerRecord {
@@ -38,6 +45,8 @@ describe("Discord rendering", () => {
     expect(JSON.stringify(message.components)).toContain("Revision 0");
     expect(JSON.stringify(message.components)).toContain("LeoGGcat");
     expect(message.allowedMentions).toEqual({ parse: [] });
+    expect(JSON.stringify(message.components)).toContain("最高球探分級");
+    expect(JSON.stringify(message.components)).not.toContain("internalRating");
   });
 
   test("renders a PNG share card", async () => {
@@ -45,7 +54,76 @@ describe("Discord rendering", () => {
     const png = await sharpShareCardRenderer.render(record(completed));
     expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
     expect(png.byteLength).toBeGreaterThan(10_000);
+    expect(await sharp(png).metadata()).toMatchObject({ width: 1200, height: 1600, format: "png" });
+    if (!completed.summary) throw new Error("Expected a completed career summary");
+    expect(createShareCardViewModel(completed.summary).totalEarnings).toContain("萬");
     expect(ATTRIBUTION).toContain("CC BY-NC 4.0");
+  });
+
+  test("renders a private salary duel result poster after the seed is revealed", async () => {
+    const duel: SalaryDuel = {
+      id: "duel-card",
+      status: "completed",
+      positionGroup: "catcher",
+      engineVersion: "0.4.0",
+      rulesetVersion: "salary-duel-v1",
+      seedCommitment: "commitment",
+      revealedSeed: "revealed-private-seed",
+      winnerSlot: 2,
+      outcomeReason: "score",
+      inviteExpiresAt: new Date("2026-08-14T00:00:00.000Z"),
+      deadlineAt: new Date("2026-08-20T00:00:00.000Z"),
+      players: [
+        {
+          duelId: "duel-card",
+          slot: 1,
+          discordUserId: "1",
+          playerName: "先發捕手",
+          careerId: "career-1",
+          status: "completed",
+          totalEarnings: 12_000,
+          peakAnnualSalary: 1_200,
+          lastAnnualSalary: 900,
+          finalStateHash: "hash-1",
+          resultChannelId: null,
+          resultMessageId: null,
+          finishedAt: new Date(),
+        },
+        {
+          duelId: "duel-card",
+          slot: 2,
+          discordUserId: "2",
+          playerName: "鐵捕",
+          careerId: "career-2",
+          status: "completed",
+          totalEarnings: 13_500,
+          peakAnnualSalary: 1_400,
+          lastAnnualSalary: 1_000,
+          finalStateHash: "hash-2",
+          resultChannelId: null,
+          resultMessageId: null,
+          finishedAt: new Date(),
+        },
+      ],
+    };
+    const png = await sharpShareCardRenderer.renderDuel(duel);
+    expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(await sharp(png).metadata()).toMatchObject({ width: 1200, height: 1600 });
+    expect(png.byteLength).toBeLessThan(5 * 1024 * 1024);
+  });
+
+  test("renders clear family priorities and salary in the main container", () => {
+    const career = record();
+    career.state.stage = "professional";
+    career.state.contract.annualSalary = 600;
+    career.state.contract.yearsRemaining = 2;
+    career.state.contract.totalEarnings = 1_800;
+    career.state.pending = { type: "life", eventId: "anniversary" };
+    const rendered = JSON.stringify(renderCareer(career).components);
+    expect(rendered).toContain("家庭還是比較重要");
+    expect(rendered).toContain("棒球還是比較重要");
+    expect(rendered).toContain("年薪 600 萬");
+    expect(rendered).toContain("生涯收入 1,800 萬");
   });
 
   test("renders attached share cards inside Components V2 media galleries", () => {

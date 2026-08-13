@@ -1,5 +1,6 @@
 import {
   type AbilityKey,
+  CAREER_EVENTS,
   type CareerState,
   type GameAction,
   reduceCareer,
@@ -14,8 +15,13 @@ export function automaticAction(state: CareerState): GameAction {
       return { type: "allocate_training", primary: "velocity", secondary: "control" };
     if (pending.assignments.length < pending.dice.length) {
       const preview = trainingPreview(state);
-      const abilities: AbilityKey[] = ["velocity", "control", "breaking", "stamina"];
-      const ability = abilities.find((candidate) => preview.abilities[candidate] < 80);
+      const abilities: AbilityKey[] =
+        (state.positionGroup ?? "pitcher") === "pitcher"
+          ? ["velocity", "control", "breaking", "stamina"]
+          : state.positionGroup === "catcher"
+            ? ["contact", "power", "eye", "fielding", "range", "arm", "calling", "speed", "stamina"]
+            : ["contact", "power", "eye", "fielding", "range", "arm", "speed", "stamina"];
+      const ability = abilities.find((candidate) => (preview.abilities[candidate] ?? 0) < 80);
       if (!ability) return { type: "confirm_training" };
       return {
         type: "assign_training_die",
@@ -24,9 +30,29 @@ export function automaticAction(state: CareerState): GameAction {
     }
     return { type: "confirm_training" };
   }
-  if (pending.type === "event") return { type: "choose_event", strategy: "normal" };
+  if (pending.type === "event") {
+    const event = CAREER_EVENTS.find((candidate) => candidate.id === pending.eventId);
+    return {
+      type: "choose_event",
+      strategy: event?.choiceLabels?.[2] === undefined && event?.choiceLabels ? "safe" : "normal",
+    };
+  }
   if (pending.type === "pitch_effort") return { type: "choose_pitch_effort", effort: "normal" };
-  if (pending.type === "draft") return { type: "choose_draft", choice: "draft" };
+  if (pending.type === "draft") {
+    if (pending.canEnterDraft !== false) return { type: "choose_draft", choice: "draft" };
+    if (pending.canContinueSchool) return { type: "choose_draft", choice: "continue_school" };
+    if (pending.canJoinAmateur) return { type: "choose_draft", choice: "join_amateur" };
+    return { type: "choose_draft", choice: "retire" };
+  }
+  if (pending.type === "scout_opportunity")
+    return {
+      type: "choose_scout_opportunity",
+      choice:
+        pending.offers.find((offer) => offer.kind === "mlb_contract")?.id ??
+        pending.offers.find((offer) => offer.kind === "npb_contract")?.id ??
+        pending.offers[0]?.id ??
+        "decline",
+    };
   if (pending.type === "tj") return { type: "choose_tj", choice: "surgery" };
   if (pending.type === "contract") {
     return {
@@ -37,6 +63,14 @@ export function automaticAction(state: CareerState): GameAction {
           : (pending.offers.find((offer) => offer.kind === "short")?.id ?? "short"),
     };
   }
+  if (pending.type === "contract_terms" || pending.type === "free_agent_market") {
+    return {
+      type: "choose_contract",
+      choice: pending.offers[0]?.id ?? (pending.type === "free_agent_market" ? "retire" : "short"),
+    };
+  }
+  if (pending.type === "free_agency_decision")
+    return { type: "choose_free_agency", choice: "market" };
   if (pending.type === "life") return { type: "choose_life", choice: "accept" };
   if (pending.type === "abl") return { type: "choose_abl", choice: "accept" };
   if (pending.type === "international") return { type: "choose_international", choice: "accept" };

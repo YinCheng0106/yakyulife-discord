@@ -3,6 +3,7 @@ import {
   DomainError,
   ENGINE_VERSION,
   LEGACY_ENGINE_VERSION,
+  MULTI_LEAGUE_ENGINE_VERSION,
 } from "@yakyulife/core";
 
 export interface BotConfig {
@@ -29,7 +30,14 @@ export function loadConfig(): BotConfig {
   if (!levels.includes(configuredLevel as (typeof levels)[number]))
     throw new DomainError("LOG_LEVEL 無效");
   const careerEngineVersion = process.env.CAREER_ENGINE_VERSION?.trim() || ENGINE_VERSION;
-  if (![LEGACY_ENGINE_VERSION, CORE_ENGINE_VERSION, ENGINE_VERSION].includes(careerEngineVersion))
+  if (
+    ![
+      LEGACY_ENGINE_VERSION,
+      CORE_ENGINE_VERSION,
+      MULTI_LEAGUE_ENGINE_VERSION,
+      ENGINE_VERSION,
+    ].includes(careerEngineVersion)
+  )
     throw new DomainError("CAREER_ENGINE_VERSION 無效");
   return {
     discordToken: required("DISCORD_TOKEN"),

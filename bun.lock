@@ -22,7 +22,7 @@
     },
     "apps/bot": {
       "name": "@yakyulife/bot",
-      "version": "0.1.0",
+      "version": "0.4.0",
       "dependencies": {
         "@yakyulife/core": "workspace:*",
         "@yakyulife/discord": "workspace:*",
@@ -33,11 +33,11 @@
     },
     "packages/core": {
       "name": "@yakyulife/core",
-      "version": "0.1.0",
+      "version": "0.4.0",
     },
     "packages/discord": {
       "name": "@yakyulife/discord",
-      "version": "0.1.0",
+      "version": "0.4.0",
       "dependencies": {
         "@yakyulife/core": "workspace:*",
         "discord.js": "14.26.4",
@@ -46,7 +46,7 @@
     },
     "packages/postgres": {
       "name": "@yakyulife/postgres",
-      "version": "0.1.0",
+      "version": "0.4.0",
       "dependencies": {
         "@yakyulife/core": "workspace:*",
       },

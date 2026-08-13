@@ -1,8 +1,8 @@
 # YaKyuLife Discord Bot
 
-YaKyuLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supabase PostgreSQL 製作的非營利投手生涯模擬 Bot。投手模式提供逐骰配點、高中與大學選秀、中職、日職、美職、韓職、澳職、國際賽、人生事件、傷病、TJ、合約、FA、衰退、逐年生涯紀錄、引退與 PNG 分享卡。
+YaKyuLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supabase PostgreSQL 製作的非營利棒球生涯模擬 Bot。v0.4 支援投手、捕手、內野手與外野手，並包含高中／大學／業餘成棒球探路線、逐骰配點、多國聯盟、國際賽、人生事件、傷病、三階段 FA、薪資好友賽、逐年紀錄與直式 PNG 生涯海報。
 
-本專案改編自 [LeoGGcat／YaKyuLife](https://github.com/LeoGGcat/yakyulife)，規則基準為 [`913cad27`](https://github.com/LeoGGcat/yakyulife/commit/913cad27db86bda79cbd53dc5666ab15d28c5d2d)，依 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 授權。這是獨立改作，不代表原作者背書，不得用於廣告、付費功能或其他商業用途。
+本專案改編自 [LeoGGcat／YaKyuLife](https://github.com/LeoGGcat/yakyulife)。舊 engine 固定於 [`913cad27`](https://github.com/LeoGGcat/yakyulife/commit/913cad27db86bda79cbd53dc5666ab15d28c5d2d)，v0.4 規則比對至 [`d3880c2`](https://github.com/LeoGGcat/yakyulife/commit/d3880c2996e7b418e2a3518a00cf69956c7ef9d9)，依 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) 授權。這是獨立改作，不代表原作者背書，不得用於廣告、付費功能或其他商業用途。
 
 ## 架構
 
@@ -52,7 +52,11 @@ Docker image 固定使用 `oven/bun:1.3.14`，並安裝 Noto CJK 字型以固定
 
 ## 指令
 
-- `/career start mode:<dm|channel> name?:<1-10字> seed?:<1-24字>`
+- `/career start mode:<dm|channel> position:<pitcher|catcher|infielder|outfielder> name?:<1-10字> seed?:<1-24字>`
+- `/career salary-duel create position:<守位> player-name:<姓名>`
+- `/career salary-duel join code:<12字元> player-name:<姓名>`
+- `/career salary-duel status`
+- `/career salary-duel cancel`
 - `/career continue`
 - `/career status`
 - `/career history career?:<autocomplete>`
@@ -87,7 +91,11 @@ bun run db:verify
 - runtime role 只有遊戲資料 DML 權限；migration 才能執行 DDL。
 - secrets 只放部署環境，不提交 `.env`。
 - 完成與進行中的生涯長期保存；放棄且 30 天未更新的生涯由 Supabase Cron 分批清除。
+- 好友賽邀請碼只保存 SHA-256；raw seed 在對局結束前不公開。對局結果由伺服器 action replay／state hash 與資料庫收入結算，不接受客戶端分數。
+- 薪資統一為「新臺幣萬元（遊戲值）」。遊戲採 5 年 FA 與測市後 90%／70% 回母隊規則，這是原作平衡機制，不是現行 CPBL 規章。
+- 球探只讀取已展現能力、當季成績、年齡、守位需求與健康，不讀取隱藏潛力；UI 只顯示文字分級，內部評價不會公開。
+- 中職新人路線以推薦／測試會、選秀及三次落選後自由協商呈現；這是依現行制度做的遊戲化簡化。日職與美職球探達門檻後可提出架空球隊合約。
 
-`CAREER_ENGINE_VERSION` 控制新建立生涯使用的版本，可設為 `0.1.0`、`0.2.0` 或 `0.3.0`。既有生涯一律依自身 engine 版本繼續，不會在中途被轉換。
+`CAREER_ENGINE_VERSION` 控制新建立生涯使用的版本，可設為 `0.1.0`、`0.2.0`、`0.3.0` 或 `0.4.0`。四守位與薪資好友賽需要 `0.4.0`；既有生涯一律依自身 engine 版本繼續，不會在中途被轉換。
 
 部署方式請見 `docs/DEPLOYMENT.md`，上游同步紀錄請見 `docs/UPSTREAM_SYNC.md`。

@@ -1,11 +1,50 @@
 export const LEGACY_ENGINE_VERSION = "0.1.0";
 export const CORE_ENGINE_VERSION = "0.2.0";
-export const ENGINE_VERSION = "0.3.0";
-export const UPSTREAM_COMMIT = "913cad27db86bda79cbd53dc5666ab15d28c5d2d";
-export const STATE_SCHEMA_VERSION = 3;
+export const MULTI_LEAGUE_ENGINE_VERSION = "0.3.0";
+export const ENGINE_VERSION = "0.4.0";
+export const UPSTREAM_COMMIT = "d3880c2996e7b418e2a3518a00cf69956c7ef9d9";
+export const LEGACY_UPSTREAM_COMMIT = "913cad27db86bda79cbd53dc5666ab15d28c5d2d";
+export const STATE_SCHEMA_VERSION = 4;
+export const SALARY_DUEL_RULESET_VERSION = "salary-duel-v1";
 
-export type AbilityKey = "stamina" | "velocity" | "control" | "breaking";
-export type Stage = "high_school" | "university" | "professional" | "retired";
+export const ENGINE_METADATA = {
+  [LEGACY_ENGINE_VERSION]: {
+    schemaVersion: 1,
+    upstreamCommit: LEGACY_UPSTREAM_COMMIT,
+    rngMode: "cursor",
+  },
+  [CORE_ENGINE_VERSION]: {
+    schemaVersion: 2,
+    upstreamCommit: LEGACY_UPSTREAM_COMMIT,
+    rngMode: "cursor",
+  },
+  [MULTI_LEAGUE_ENGINE_VERSION]: {
+    schemaVersion: 3,
+    upstreamCommit: LEGACY_UPSTREAM_COMMIT,
+    rngMode: "cursor",
+  },
+  [ENGINE_VERSION]: {
+    schemaVersion: STATE_SCHEMA_VERSION,
+    upstreamCommit: UPSTREAM_COMMIT,
+    rngMode: "keyed",
+  },
+} as const;
+
+export type PositionGroup = "pitcher" | "catcher" | "infielder" | "outfielder";
+export type DefensivePosition = "P" | "C" | "1B" | "2B" | "3B" | "SS" | "LF" | "CF" | "RF" | "DH";
+export type PitcherAbilityKey = "stamina" | "velocity" | "control" | "breaking";
+export type HitterAbilityKey =
+  | "stamina"
+  | "contact"
+  | "power"
+  | "speed"
+  | "eye"
+  | "range"
+  | "fielding"
+  | "arm"
+  | "calling";
+export type AbilityKey = PitcherAbilityKey | HitterAbilityKey;
+export type Stage = "high_school" | "university" | "amateur_club" | "professional" | "retired";
 export type LeagueLevel =
   | "amateur"
   | "cpbl2"
@@ -29,6 +68,14 @@ export type PitchEffort = "full" | "normal" | "easy";
 export type EventStrategy = "safe" | "normal" | "bold";
 export type PlayMode = "dm" | "channel";
 export type CareerStatus = "active" | "completed" | "abandoned";
+export type ScoutingMarket = "cpbl" | "npb" | "mlb";
+export type ScoutingTier = "unseen" | "watchlist" | "cross_check" | "invited";
+export type DraftEligibility =
+  | "none"
+  | "tryout"
+  | "coach_recommendation"
+  | "club_recommendation"
+  | "national_team_award";
 
 export type TraitKey =
   | "genius"
@@ -41,9 +88,17 @@ export type TraitKey =
 
 export interface AbilitySet {
   stamina: number;
-  velocity: number;
-  control: number;
-  breaking: number;
+  velocity?: number;
+  control?: number;
+  breaking?: number;
+  contact?: number;
+  power?: number;
+  speed?: number;
+  eye?: number;
+  range?: number;
+  fielding?: number;
+  arm?: number;
+  calling?: number;
 }
 
 export interface TraitSet {
@@ -56,7 +111,7 @@ export interface TraitSet {
   rubber_arm: boolean;
 }
 
-export interface SeasonStats {
+export interface SeasonBase {
   seasonId?: string;
   calendarYear?: number;
   seasonLabel?: string;
@@ -66,8 +121,14 @@ export interface SeasonStats {
   age: number;
   level: LeagueLevel;
   team: string;
-  role: PitcherRole;
   games: number;
+  injured: "none" | "minor" | "major" | "rehab";
+  awards: string[];
+}
+
+export interface PitcherSeasonStats extends SeasonBase {
+  kind?: "pitcher";
+  role: PitcherRole;
   starts: number;
   wins: number;
   losses: number;
@@ -78,9 +139,26 @@ export interface SeasonStats {
   earnedRuns: number;
   era: number;
   whip: number;
-  injured: "none" | "minor" | "major" | "rehab";
-  awards: string[];
 }
+
+export interface HitterSeasonStats extends SeasonBase {
+  kind: "hitter";
+  position: DefensivePosition;
+  plateAppearances: number;
+  atBats: number;
+  hits: number;
+  homeRuns: number;
+  rbis: number;
+  walks: number;
+  stolenBases: number;
+  average: number;
+  onBasePercentage: number;
+  slugging: number;
+  ops: number;
+  defense: number;
+}
+
+export type SeasonStats = PitcherSeasonStats | HitterSeasonStats;
 
 export type EventCategory =
   | "career"
@@ -149,6 +227,9 @@ export interface CareerContract {
   yearsRemaining: number;
   serviceYears: number;
   totalEarnings: number;
+  topLevelServiceYears?: number;
+  clubControlled?: boolean;
+  peakAnnualSalary?: number;
 }
 
 export interface InjuryState {
@@ -156,6 +237,26 @@ export interface InjuryState {
   temporaryPenalty: number;
   tjLoad: number;
   tjCount: number;
+}
+
+export interface ScoutingReport {
+  year: number;
+  market: ScoutingMarket;
+  tier: ScoutingTier;
+  summary: string;
+  strength: AbilityKey;
+  concern: AbilityKey;
+}
+
+export interface ScoutingState {
+  exposure: number;
+  markets: Record<
+    ScoutingMarket,
+    { internalRating: number; tier: ScoutingTier; lastEvaluatedYear: number | null }
+  >;
+  draftEligibility: DraftEligibility;
+  draftAttempts: number;
+  reports: ScoutingReport[];
 }
 
 export interface CareerSummary {
@@ -168,6 +269,20 @@ export interface CareerSummary {
   careerInnings: number;
   bestEra: number | null;
   totalEarnings: number;
+  peakAnnualSalary?: number;
+  lastAnnualSalary?: number;
+  positionGroup?: PositionGroup;
+  primaryPosition?: DefensivePosition;
+  finalTeam?: string;
+  finalLeague?: LeagueKey;
+  careerHighlights?: string[];
+  careerGames?: number;
+  careerHits?: number;
+  careerHomeRuns?: number;
+  careerRbis?: number;
+  careerStolenBases?: number;
+  careerAverage?: number | null;
+  careerOps?: number | null;
   honors: string[];
   traits: TraitKey[];
   ending: string;
@@ -181,12 +296,19 @@ export interface CareerSummary {
     wins: number;
     saves: number;
     strikeouts: number;
+    plateAppearances?: number;
+    hits?: number;
+    homeRuns?: number;
+    rbis?: number;
+    stolenBases?: number;
   }>;
   family?: {
     status: LifeState["status"];
     partner: string | null;
     children: number;
   };
+  highestScoutingTier?: ScoutingTier;
+  scoutingHighlights?: string[];
 }
 
 export interface TrainingDecision {
@@ -209,8 +331,27 @@ export interface EffortDecision {
 
 export interface DraftDecision {
   type: "draft";
+  canEnterDraft?: boolean;
   canContinueSchool: boolean;
+  canJoinAmateur?: boolean;
+  canRetire?: boolean;
   schoolLabel: "university" | "remain_university" | null;
+}
+
+export interface ScoutOffer {
+  id: string;
+  kind: "cpbl_tryout" | "cpbl_recommendation" | "npb_contract" | "mlb_contract" | "cpbl_direct";
+  label: string;
+  team?: string;
+  level?: LeagueLevel;
+  salary?: number;
+  years?: number;
+}
+
+export interface ScoutOpportunityDecision {
+  type: "scout_opportunity";
+  offers: ScoutOffer[];
+  fallback: "continue_school" | "join_amateur" | "remain_amateur" | "retire";
 }
 
 export interface TjDecision {
@@ -228,6 +369,26 @@ export interface ContractDecision {
     team?: string;
     source?: "posting" | "fa" | "free_agent" | "injury_replacement" | "tryout";
   }>;
+}
+
+export interface FreeAgencyDecision {
+  type: "free_agency_decision";
+  homeBaseSalary: number;
+}
+
+export interface ContractTermsDecision {
+  type: "contract_terms";
+  team: string;
+  level: LeagueLevel;
+  source: "home" | "market";
+  offers: ContractDecision["offers"];
+}
+
+export interface FreeAgentMarketDecision {
+  type: "free_agent_market";
+  homeBaseSalary: number;
+  offers: ContractDecision["offers"];
+  returnMultiplier: 0.9 | 0.7;
 }
 
 export interface CareerDecision {
@@ -256,8 +417,12 @@ export type PendingDecision =
   | EventDecision
   | EffortDecision
   | DraftDecision
+  | ScoutOpportunityDecision
   | TjDecision
   | ContractDecision
+  | FreeAgencyDecision
+  | ContractTermsDecision
+  | FreeAgentMarketDecision
   | CareerDecision
   | LifeDecision
   | AblDecision
@@ -269,6 +434,14 @@ export interface CareerState {
   upstreamCommit: string;
   seed: string;
   rngState: number;
+  positionGroup?: PositionGroup;
+  primaryPosition?: DefensivePosition;
+  utilityRole?: boolean;
+  seasonAppearanceModifier?: number;
+  seasonDefenseBonus?: number;
+  positionSalaryBonusDisabled?: boolean;
+  internationalEventChoice?: "family" | "baseball" | null;
+  scouting?: ScoutingState;
   name: string;
   age: number;
   year: number;
@@ -302,9 +475,14 @@ export type GameAction =
   | { type: "confirm_training" }
   | { type: "choose_event"; strategy: EventStrategy }
   | { type: "choose_pitch_effort"; effort: PitchEffort }
-  | { type: "choose_draft"; choice: "draft" | "continue_school" }
+  | {
+      type: "choose_draft";
+      choice: "draft" | "continue_school" | "join_amateur" | "retire";
+    }
+  | { type: "choose_scout_opportunity"; choice: string }
   | { type: "choose_tj"; choice: "surgery" | "injection" }
   | { type: "choose_contract"; choice: string }
+  | { type: "choose_free_agency"; choice: "home" | "market" | "retire" }
   | { type: "choose_life"; choice: "accept" | "decline" | "bold" }
   | { type: "choose_abl"; choice: "accept" | "decline" }
   | { type: "choose_international"; choice: "accept" | "decline" }
@@ -344,6 +522,71 @@ export interface NewCareerInput {
   seed: string;
   playMode: PlayMode;
   location: CareerLocation;
+  positionGroup?: PositionGroup;
+}
+
+export type SalaryDuelStatus =
+  | "pending"
+  | "active"
+  | "completed"
+  | "forfeited"
+  | "declined"
+  | "expired"
+  | "no_contest"
+  | "cancelled_privacy"
+  | "invalid";
+
+export interface SalaryDuelPlayer {
+  duelId: string;
+  slot: 1 | 2;
+  discordUserId: string | null;
+  playerName: string | null;
+  careerId: string | null;
+  status: "invited" | "playing" | "completed" | "forfeited" | "expired" | "deleted";
+  totalEarnings: number | null;
+  peakAnnualSalary: number | null;
+  lastAnnualSalary: number | null;
+  finalStateHash: string | null;
+  resultChannelId: string | null;
+  resultMessageId: string | null;
+  finishedAt: Date | null;
+}
+
+export interface NewSalaryDuelInput {
+  id: string;
+  creatorUserId: string;
+  creatorPlayerName: string;
+  positionGroup: PositionGroup;
+  inviteCodeHash: string;
+  inviteExpiresAt: Date;
+  engineVersion: string;
+  rulesetVersion: string;
+}
+
+export interface JoinSalaryDuelInput {
+  inviteCodeHash: string;
+  joinerUserId: string;
+  joinerPlayerName: string;
+  privateSeed: string;
+  seedCommitment: string;
+  now: Date;
+  deadlineAt: Date;
+  careerIds: readonly [string, string];
+}
+
+export interface SalaryDuel {
+  id: string;
+  status: SalaryDuelStatus;
+  positionGroup: PositionGroup;
+  engineVersion: string;
+  rulesetVersion: string;
+  seedCommitment: string | null;
+  revealedSeed: string | null;
+  winnerSlot: 1 | 2 | null;
+  outcomeReason: "score" | "draw" | "forfeit" | "timeout" | "privacy" | "invalid" | null;
+  inviteExpiresAt: Date;
+  deadlineAt: Date | null;
+  players: SalaryDuelPlayer[];
 }
 
 export interface CommitActionInput {

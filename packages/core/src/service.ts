@@ -11,8 +11,8 @@ import {
   type CommitActionResult,
   ENGINE_VERSION,
   LEGACY_ENGINE_VERSION,
+  MULTI_LEAGUE_ENGINE_VERSION,
   type NewCareerInput,
-  UPSTREAM_COMMIT,
 } from "./types.ts";
 
 export class CareerService {
@@ -32,12 +32,26 @@ export class CareerService {
     if (seed.length > 24) throw new DomainError("種子碼最多 24 個字元");
     const now = this.clock.now();
     if (
-      ![LEGACY_ENGINE_VERSION, CORE_ENGINE_VERSION, ENGINE_VERSION].includes(
-        this.newCareerEngineVersion,
-      )
+      ![
+        LEGACY_ENGINE_VERSION,
+        CORE_ENGINE_VERSION,
+        MULTI_LEAGUE_ENGINE_VERSION,
+        ENGINE_VERSION,
+      ].includes(this.newCareerEngineVersion)
     )
       throw new DomainError("不支援的新生涯 engine 版本");
-    const state = createCareerState(name, seed, this.newCareerEngineVersion);
+    if (
+      this.newCareerEngineVersion !== ENGINE_VERSION &&
+      input.positionGroup &&
+      input.positionGroup !== "pitcher"
+    )
+      throw new DomainError("舊版 engine 只支援投手生涯");
+    const state = createCareerState(
+      name,
+      seed,
+      this.newCareerEngineVersion,
+      input.positionGroup ?? "pitcher",
+    );
     return this.repository.create({
       id: this.ids.next(),
       discordUserId: input.discordUserId,
@@ -46,7 +60,7 @@ export class CareerService {
       location: input.location,
       seed: state.seed,
       engineVersion: state.engineVersion,
-      upstreamCommit: UPSTREAM_COMMIT,
+      upstreamCommit: state.upstreamCommit,
       stateRevision: 0,
       state,
       summary: null,

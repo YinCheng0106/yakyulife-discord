@@ -8,6 +8,7 @@ import {
   LEVEL_LABELS,
   overall,
   type PendingDecision,
+  POSITION_GROUP_LABELS,
   ROLE_LABELS,
   STRATEGY_CONFIG,
   TRAIT_LABELS,
@@ -61,23 +62,29 @@ function decisionRows(
 ): ActionRowBuilder<ButtonBuilder>[] {
   if (!pending) return [];
   if (pending.type === "training") {
-    const abilities: AbilityKey[] = ["stamina", "velocity", "control", "breaking"];
+    const abilities: AbilityKey[] =
+      (career.state.positionGroup ?? "pitcher") === "pitcher"
+        ? ["stamina", "velocity", "control", "breaking"]
+        : career.state.positionGroup === "catcher"
+          ? ["stamina", "contact", "power", "speed", "eye", "range", "fielding", "arm", "calling"]
+          : ["stamina", "contact", "power", "speed", "eye", "range", "fielding", "arm"];
     if (career.engineVersion !== LEGACY_ENGINE_VERSION) {
       const assignments = pending.assignments ?? [];
       const preview = trainingPreview(career.state);
       const complete = assignments.length >= pending.dice.length;
-      const allCapped = abilities.every((ability) => preview.abilities[ability] >= 80);
+      const allCapped = abilities.every((ability) => (preview.abilities[ability] ?? 0) >= 80);
+      const abilityButtons = abilities.map((ability) =>
+        button(
+          career,
+          `die_${ability}`,
+          `${ABILITY_LABELS[ability]} ${preview.abilities[ability] ?? 0}${(preview.gains[ability] ?? 0) > 0 ? ` (+${preview.gains[ability]})` : ""}`,
+          ButtonStyle.Primary,
+          complete || ((preview.abilities[ability] ?? 0) >= 80 && !allCapped),
+        ),
+      );
       return [
-        actionRow(
-          abilities.map((ability) =>
-            button(
-              career,
-              `die_${ability}`,
-              `${ABILITY_LABELS[ability]} ${preview.abilities[ability]}${preview.gains[ability] > 0 ? ` (+${preview.gains[ability]})` : ""}`,
-              ButtonStyle.Primary,
-              complete || (preview.abilities[ability] >= 80 && !allCapped),
-            ),
-          ),
+        ...Array.from({ length: Math.ceil(abilityButtons.length / 5) }, (_, index) =>
+          actionRow(abilityButtons.slice(index * 5, index * 5 + 5)),
         ),
         actionRow([
           button(
@@ -115,22 +122,32 @@ function decisionRows(
     ];
   }
   if (pending.type === "event") {
+    const event = CAREER_EVENTS.find((candidate) => candidate.id === pending.eventId);
     const boldChance = career.state.traits.clutch ? 50 : STRATEGY_CONFIG.bold.successChance;
+    const labels = event?.choiceLabels;
+    if (labels && labels[2] === undefined) {
+      return [
+        actionRow([
+          button(career, "event_safe", labels[0], ButtonStyle.Success),
+          button(career, "event_bold", labels[1], ButtonStyle.Primary),
+        ]),
+      ];
+    }
     return [
       actionRow([
         button(
           career,
           "event_safe",
-          `保守 ${STRATEGY_CONFIG.safe.successChance}%`,
+          labels?.[0] ?? `保守 ${STRATEGY_CONFIG.safe.successChance}%`,
           ButtonStyle.Success,
         ),
         button(
           career,
           "event_normal",
-          `正常 ${STRATEGY_CONFIG.normal.successChance}%`,
+          labels?.[1] ?? `正常 ${STRATEGY_CONFIG.normal.successChance}%`,
           ButtonStyle.Primary,
         ),
-        button(career, "event_bold", `豪賭 ${boldChance}%`, ButtonStyle.Danger),
+        button(career, "event_bold", labels?.[2] ?? `豪賭 ${boldChance}%`, ButtonStyle.Danger),
       ]),
     ];
   }
@@ -144,9 +161,55 @@ function decisionRows(
     ];
   }
   if (pending.type === "draft") {
-    const buttons = [button(career, "draft_enter", "投入選秀", ButtonStyle.Primary)];
-    if (pending.canContinueSchool) buttons.push(button(career, "draft_school", "繼續升學"));
+    const buttons: ButtonBuilder[] = [];
+    if (pending.canEnterDraft !== false)
+      buttons.push(button(career, "draft_enter", "投入中職新人選秀", ButtonStyle.Primary));
+    if (pending.canContinueSchool)
+      buttons.push(
+        button(
+          career,
+          "draft_school",
+          pending.schoolLabel === "university" ? "升大學繼續養成" : "留校繼續養成",
+          ButtonStyle.Success,
+        ),
+      );
+    if (pending.canJoinAmateur)
+      buttons.push(
+        button(
+          career,
+          "draft_amateur",
+          career.state.stage === "amateur_club" ? "繼續業餘成棒" : "加入業餘成棒",
+          ButtonStyle.Success,
+        ),
+      );
+    if (pending.canRetire)
+      buttons.push(button(career, "draft_retire", "結束競技生涯", ButtonStyle.Danger));
     return [actionRow(buttons)];
+  }
+  if (pending.type === "scout_opportunity") {
+    const offers = pending.offers.map((offer) =>
+      button(
+        career,
+        `scout_offer_${offer.id}`,
+        offer.kind === "cpbl_tryout"
+          ? "參加新人測試會｜成功才可進入選秀"
+          : `${offer.label}${offer.team ? `｜${offer.team}` : ""}`,
+        offer.kind === "cpbl_tryout" ? ButtonStyle.Primary : ButtonStyle.Success,
+      ),
+    );
+    offers.push(
+      button(
+        career,
+        "scout_decline",
+        pending.fallback === "continue_school"
+          ? "留校繼續養成"
+          : pending.fallback === "join_amateur"
+            ? "先考慮業餘成棒"
+            : "繼續業餘路線",
+        ButtonStyle.Secondary,
+      ),
+    );
+    return [actionRow(offers)];
   }
   if (pending.type === "tj") {
     return [
@@ -156,7 +219,11 @@ function decisionRows(
       ]),
     ];
   }
-  if (pending.type === "contract") {
+  if (
+    pending.type === "contract" ||
+    pending.type === "contract_terms" ||
+    pending.type === "free_agent_market"
+  ) {
     const offers = pending.offers.map((offer) =>
       button(
         career,
@@ -170,14 +237,32 @@ function decisionRows(
                 injury_replacement: "傷兵替補",
                 tryout: "測試約",
               }[offer.source ?? "free_agent"]
-            } ${offer.years} 年`
+            } ${offer.years} 年／${offer.salary} 萬`
           : `${offer.kind === "long" ? "長約" : "短約"} ${offer.years} 年／${offer.salary} 萬`,
         offer.kind === "long" ? ButtonStyle.Primary : ButtonStyle.Success,
       ),
     );
+    const fallback =
+      pending.type === "free_agent_market"
+        ? [
+            button(
+              career,
+              "fa_home",
+              `回母隊｜1 年／${Math.round(pending.homeBaseSalary * pending.returnMultiplier)} 萬`,
+              ButtonStyle.Success,
+            ),
+            button(career, "fa_retire", "引退", ButtonStyle.Danger),
+          ]
+        : [button(career, "contract_retire", "引退", ButtonStyle.Danger)];
+    return [actionRow(offers.slice(0, 4)), actionRow(fallback)];
+  }
+  if (pending.type === "free_agency_decision") {
     return [
-      actionRow(offers.slice(0, 4)),
-      actionRow([button(career, "contract_retire", "引退", ButtonStyle.Danger)]),
+      actionRow([
+        button(career, "fa_home", "與母隊續約", ButtonStyle.Success),
+        button(career, "fa_market", "測試 FA 市場", ButtonStyle.Primary),
+        button(career, "fa_retire", "引退", ButtonStyle.Danger),
+      ]),
     ];
   }
   if (pending.type === "life") {
@@ -194,14 +279,22 @@ function decisionRows(
         button(
           career,
           "life_accept",
-          pending.eventId === "proposal" ? "求婚" : "接受",
+          pending.eventId === "proposal"
+            ? "求婚"
+            : pending.eventId === "dating"
+              ? "開始交往"
+              : "家庭還是比較重要",
           ButtonStyle.Success,
         ),
         button(
           career,
           "life_decline",
-          pending.eventId === "proposal" ? "延後婚期" : "婉拒",
-          ButtonStyle.Secondary,
+          pending.eventId === "proposal"
+            ? "延後婚期"
+            : pending.eventId === "dating"
+              ? "專注棒球"
+              : "棒球還是比較重要",
+          ButtonStyle.Primary,
         ),
       ]),
     ];
@@ -241,9 +334,21 @@ function decisionText(pending: PendingDecision | null): string {
       : "本年主要事件已發生，請選擇處理方式。";
   }
   if (pending.type === "pitch_effort") return "請先決定本季的投球強度。";
-  if (pending.type === "draft") return "生涯來到選秀岔路，請決定下一步。";
+  if (pending.type === "draft")
+    return pending.canEnterDraft === false
+      ? "目前尚未取得中職參選資格，請選擇升學、業餘成棒或結束競技生涯。"
+      : "已取得遊戲化簡化的中職參選資格，請決定是否投入選秀。";
+  if (pending.type === "scout_opportunity")
+    return "球探邀約已保存，重建訊息不會重抽；同年度接受其中一項後，其他邀約即失效。";
   if (pending.type === "tj") return "韌帶負荷已達臨界值，必須做出醫療決定。";
-  if (pending.type === "contract") return "合約到期，請選擇下一份合約或引退。";
+  if (pending.type === "contract" || pending.type === "contract_terms")
+    return "合約到期，請選擇下一份合約或引退。";
+  if (pending.type === "free_agency_decision")
+    return "你已取得遊戲內 5 年 FA 資格。可先與母隊談約，或測試市場；測市後回頭的母隊報價會降低。";
+  if (pending.type === "free_agent_market")
+    return pending.offers.length > 0
+      ? "FA 行情已固定。可接受外隊報價，或以折價的一年約回到母隊。"
+      : "FA 市場暫無外隊報價。可接受母隊 70% 的一年約，或引退。";
   if (pending.type === "life") {
     if (pending.eventId === "dating") return "場外出現新的緣分，要讓這段關係開始嗎？";
     if (pending.eventId === "proposal") return "交往多年後，兩人來到婚姻的岔路。";
@@ -266,13 +371,59 @@ export function renderCareer(career: CareerRecord): CareerMessage {
     ? state.recentEvents.map((event) => `- **${event.title}**｜${event.body}`)
     : state.lastOutcome.map((line) => `- ${line}`);
   const outcome = recent.length > 0 ? recent.join("\n") : "- 尚無";
+  const group = state.positionGroup ?? "pitcher";
+  const abilityText = (
+    group === "pitcher"
+      ? ["stamina", "velocity", "control", "breaking"]
+      : group === "catcher"
+        ? ["stamina", "contact", "power", "speed", "eye", "range", "fielding", "arm", "calling"]
+        : ["stamina", "contact", "power", "speed", "eye", "range", "fielding", "arm"]
+  )
+    .map((key) => `${ABILITY_LABELS[key as AbilityKey]} ${state.abilities[key as AbilityKey] ?? 0}`)
+    .join("｜");
+  const role = group === "pitcher" ? ROLE_LABELS[state.role] : (state.primaryPosition ?? "DH");
+  const salary =
+    state.stage === "professional"
+      ? `年薪 ${state.contract.annualSalary.toLocaleString("zh-TW")} 萬｜合約剩餘 ${state.contract.yearsRemaining} 年｜生涯收入 ${state.contract.totalEarnings.toLocaleString("zh-TW")} 萬`
+      : "尚未取得職業合約";
+  const scoutingTierLabels = {
+    unseen: "尚未進入名單",
+    watchlist: "地區球探追蹤",
+    cross_check: "球團交叉覆核",
+    invited: "正式邀請",
+  } as const;
+  const stageLabels = {
+    high_school: "高中",
+    university: "大學",
+    amateur_club: "業餘成棒",
+    professional: "職業",
+    retired: "已引退",
+  } as const;
+  const scouting = state.scouting;
+  const highestScoutingTier = scouting
+    ? ((["unseen", "watchlist", "cross_check", "invited"] as const)
+        .filter((tier) => Object.values(scouting.markets).some((market) => market.tier === tier))
+        .at(-1) ?? "unseen")
+    : null;
+  const eligibilityLabels = {
+    none: "尚未取得資格",
+    tryout: "測試會資格",
+    coach_recommendation: "高中教練推薦",
+    club_recommendation: "球團推薦",
+    national_team_award: "國手／獎項資格",
+  } as const;
+  const scoutingText =
+    scouting && state.stage !== "professional" && state.stage !== "retired"
+      ? `\n🔎 ${stageLabels[state.stage]}${state.stage === "amateur_club" ? `第 ${state.stageYear} 年` : `${state.stageYear} 年級`}｜最高球探分級 ${scoutingTierLabels[highestScoutingTier ?? "unseen"]}\n最近報告：${scouting.reports.at(-1)?.summary ?? "尚無升級報告"}\n中職參選：${eligibilityLabels[scouting.draftEligibility]}｜選秀落選 ${scouting.draftAttempts} 次`
+      : "";
   const container = new ContainerBuilder()
     .setAccentColor(0x1f8b4c)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `# ⚾ ${state.name}的投手生涯\n**${state.year} 年｜${state.age} 歲｜${state.team}｜${LEVEL_LABELS[state.level]}｜${ROLE_LABELS[state.role]}**\n` +
-          `體力 ${state.abilities.stamina}｜球速 ${state.abilities.velocity}｜控球 ${state.abilities.control}｜變化球 ${state.abilities.breaking}｜總評 ${overall(state)}\n` +
-          `特性：${traits.length > 0 ? traits.join("、") : "尚未解鎖"}`,
+        `# ⚾ ${state.name}的${POSITION_GROUP_LABELS[group]}生涯\n**${state.year} 年｜${state.age} 歲｜${state.team}｜${LEVEL_LABELS[state.level]}｜${role}**\n` +
+          `${abilityText}｜總評 ${overall(state)}\n` +
+          `💰 ${salary}（新臺幣萬元・遊戲值）\n` +
+          `特性：${traits.length > 0 ? traits.join("、") : "尚未解鎖"}${scoutingText}`,
       ),
     )
     .addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small))
@@ -365,10 +516,12 @@ export function renderCareerHistory(
     : "";
   const seasonText = visibleSeasons.length
     ? visibleSeasons
-        .map(
-          (season) =>
-            `**${season.seasonLabel ?? `${season.year} ${LEVEL_LABELS[season.level]}`}｜${season.team}｜${ROLE_LABELS[season.role]}**\n` +
-            `${season.games} 場｜${season.innings} 局｜${season.wins} 勝 ${season.losses} 敗｜${season.saves} 救援｜${season.holds} 中繼｜${season.strikeouts} K｜ERA ${season.era.toFixed(1)}｜WHIP ${season.whip.toFixed(1)}${season.injured !== "none" ? `｜傷病：${season.injured}` : ""}${season.awards.length ? `\n獎項：${season.awards.join("、")}` : ""}`,
+        .map((season) =>
+          "innings" in season
+            ? `**${season.seasonLabel ?? `${season.year} ${LEVEL_LABELS[season.level]}`}｜${season.team}｜${ROLE_LABELS[season.role]}**\n` +
+              `${season.games} 場｜${season.innings} 局｜${season.wins} 勝 ${season.losses} 敗｜${season.saves} 救援｜${season.holds} 中繼｜${season.strikeouts} K｜ERA ${season.era.toFixed(1)}｜WHIP ${season.whip.toFixed(1)}${season.injured !== "none" ? `｜傷病：${season.injured}` : ""}${season.awards.length ? `\n獎項：${season.awards.join("、")}` : ""}`
+            : `**${season.seasonLabel ?? `${season.year} ${LEVEL_LABELS[season.level]}`}｜${season.team}｜${season.position}**\n` +
+              `${season.games} 場｜${season.plateAppearances} PA｜${season.hits} 安｜${season.homeRuns} 轟｜${season.rbis} 打點｜${season.stolenBases} 盜｜AVG ${season.average.toFixed(3)}｜OBP ${season.onBasePercentage.toFixed(3)}｜SLG ${season.slugging.toFixed(3)}｜OPS ${season.ops.toFixed(3)}｜DEF ${season.defense}${season.injured !== "none" ? `｜傷病：${season.injured}` : ""}${season.awards.length ? `\n獎項：${season.awards.join("、")}` : ""}`,
         )
         .join("\n\n") + (hiddenSeasonNote ? `\n\n${hiddenSeasonNote}` : "")
     : hasSeasonEndingInjury
@@ -386,10 +539,13 @@ export function renderCareerHistory(
   } as const;
   const profileText =
     page === history.years.length - 1 && summary
-      ? `\n\n### 生涯檔案\n${(summary.leagueTotals ?? [])
-          .map(
-            (total) =>
-              `${leagueLabels[total.league]}｜${total.games} 場、${total.innings} 局、${total.wins} 勝、${total.saves} 救援、${total.strikeouts} K`,
+      ? `\n\n### 生涯檔案\n薪資：累積 ${summary.totalEarnings.toLocaleString("zh-TW")} 萬｜最高 ${summary.peakAnnualSalary?.toLocaleString("zh-TW") ?? "—"} 萬｜最後 ${summary.lastAnnualSalary?.toLocaleString("zh-TW") ?? "—"} 萬\n${(
+          summary.leagueTotals ?? []
+        )
+          .map((total) =>
+            (summary.positionGroup ?? "pitcher") === "pitcher"
+              ? `${leagueLabels[total.league]}｜${total.games} 場、${total.innings} 局、${total.wins} 勝、${total.saves} 救援、${total.strikeouts} K`
+              : `${leagueLabels[total.league]}｜${total.games} 場、${total.hits ?? 0} 安、${total.homeRuns ?? 0} 轟、${total.rbis ?? 0} 打點`,
           )
           .join(
             "\n",
@@ -399,7 +555,7 @@ export function renderCareerHistory(
     .setAccentColor(0x315a9b)
     .addTextDisplayComponents(
       new TextDisplayBuilder().setContent(
-        `# 📖 ${history.career.state.name}的生涯年表\n## ${year} 年｜${page + 1}／${Math.max(1, history.years.length)}\n\n### 年度事件\n${eventText}\n\n### 投球成績\n${seasonText}${profileText}`,
+        `# 📖 ${history.career.state.name}的生涯年表\n## ${year} 年｜${page + 1}／${Math.max(1, history.years.length)}\n\n### 年度事件\n${eventText}\n\n### ${(history.career.state.positionGroup ?? "pitcher") === "pitcher" ? "投球" : "打擊與守備"}成績\n${seasonText}${profileText}`,
       ),
     );
   if (shareFilename && summary && page === history.years.length - 1) {

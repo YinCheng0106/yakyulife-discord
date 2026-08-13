@@ -24,3 +24,29 @@ describe("career journal migration", () => {
     expect(sql).toContain("yakyulife-delete-abandoned-careers");
   });
 });
+
+describe("salary duel migration", () => {
+  const duelMigration = new URL(
+    "../../supabase/migrations/20260813023421_add_salary_duels.sql",
+    import.meta.url,
+  );
+
+  test("keeps challenge seeds and participants in the private runtime schema", async () => {
+    const sql = await Bun.file(duelMigration).text();
+    expect(sql).toContain("create table yakyulife.salary_duels");
+    expect(sql).toContain("create table yakyulife.salary_duel_players");
+    expect(sql).toContain("force row level security");
+    expect(sql).toContain("revoke all on yakyulife.salary_duels from public, anon, authenticated");
+    expect(sql).toContain("references yakyulife.careers (id) on delete set null");
+  });
+
+  test("expires live games and purges bounded 30/90 day batches", async () => {
+    const sql = await Bun.file(duelMigration).text();
+    expect(sql).toContain("interval '30 days'");
+    expect(sql).toContain("interval '90 days'");
+    expect(sql).toContain("limit 500");
+    expect(sql).toContain("create or replace function yakyulife.maintain_salary_duels");
+    expect(sql).toContain("for update skip locked");
+    expect(sql).toContain("yakyulife-expire-and-purge-salary-duels");
+  });
+});

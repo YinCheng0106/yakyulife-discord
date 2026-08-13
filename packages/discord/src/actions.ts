@@ -26,10 +26,25 @@ export function toCustomId(careerId: string, revision: number, actionKey: string
 export function actionFromKey(actionKey: string): GameAction | null {
   if (actionKey.startsWith("die_")) {
     const ability = actionKey.slice(4);
-    if (["stamina", "velocity", "control", "breaking"].includes(ability)) {
+    if (
+      [
+        "stamina",
+        "velocity",
+        "control",
+        "breaking",
+        "contact",
+        "power",
+        "speed",
+        "eye",
+        "range",
+        "fielding",
+        "arm",
+        "calling",
+      ].includes(ability)
+    ) {
       return {
         type: "assign_training_die",
-        ability: ability as "stamina" | "velocity" | "control" | "breaking",
+        ability: ability as Extract<GameAction, { type: "assign_training_die" }>["ability"],
       };
     }
   }
@@ -57,6 +72,11 @@ export function actionFromKey(actionKey: string): GameAction | null {
   }
   if (actionKey === "draft_enter") return { type: "choose_draft", choice: "draft" };
   if (actionKey === "draft_school") return { type: "choose_draft", choice: "continue_school" };
+  if (actionKey === "draft_amateur") return { type: "choose_draft", choice: "join_amateur" };
+  if (actionKey === "draft_retire") return { type: "choose_draft", choice: "retire" };
+  if (actionKey === "scout_decline") return { type: "choose_scout_opportunity", choice: "decline" };
+  if (actionKey.startsWith("scout_offer_"))
+    return { type: "choose_scout_opportunity", choice: actionKey.slice("scout_offer_".length) };
   if (actionKey === "tj_surgery") return { type: "choose_tj", choice: "surgery" };
   if (actionKey === "tj_injection") return { type: "choose_tj", choice: "injection" };
   if (actionKey.startsWith("contract_offer_"))
@@ -64,6 +84,9 @@ export function actionFromKey(actionKey: string): GameAction | null {
   if (actionKey === "contract_long") return { type: "choose_contract", choice: "long" };
   if (actionKey === "contract_short") return { type: "choose_contract", choice: "short" };
   if (actionKey === "contract_retire") return { type: "choose_contract", choice: "retire" };
+  if (actionKey === "fa_home") return { type: "choose_free_agency", choice: "home" };
+  if (actionKey === "fa_market") return { type: "choose_free_agency", choice: "market" };
+  if (actionKey === "fa_retire") return { type: "choose_free_agency", choice: "retire" };
   if (actionKey === "life_accept" || actionKey === "life_decline" || actionKey === "life_bold")
     return { type: "choose_life", choice: actionKey.slice(5) as "accept" | "decline" | "bold" };
   if (actionKey === "abl_accept" || actionKey === "abl_decline")

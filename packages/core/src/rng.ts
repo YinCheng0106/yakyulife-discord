@@ -32,3 +32,40 @@ export function pick<T>(state: { rngState: number }, values: readonly T[]): T {
   if (value === undefined) throw new Error("Cannot pick from an empty collection");
   return value;
 }
+
+export type RngStream = "world" | "career" | "choiceOutcome";
+
+/** Stateless v0.4 draw: skipped branch choices cannot shift unrelated world outcomes. */
+export function keyedRandom(
+  seed: string,
+  engineVersion: string,
+  rulesetVersion: string,
+  position: string,
+  calendarYear: number,
+  stream: RngStream,
+  context: string,
+  drawKey: string,
+  occurrence = 0,
+): number {
+  const key = [
+    seed,
+    engineVersion,
+    rulesetVersion,
+    position,
+    calendarYear,
+    stream,
+    context,
+    drawKey,
+    occurrence,
+  ].join("\u001f");
+  const digest = new Bun.CryptoHasher("sha256").update(key).digest();
+  return digest.readUInt32BE(0) / 4_294_967_296;
+}
+
+export function keyedInt(
+  minimum: number,
+  maximum: number,
+  ...args: Parameters<typeof keyedRandom>
+): number {
+  return minimum + Math.floor(keyedRandom(...args) * (maximum - minimum + 1));
+}

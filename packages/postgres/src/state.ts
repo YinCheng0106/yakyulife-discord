@@ -40,7 +40,20 @@ function validPending(value: unknown): boolean {
       (value.assignments === undefined ||
         (Array.isArray(value.assignments) &&
           value.assignments.every((item) =>
-            ["stamina", "velocity", "control", "breaking"].includes(String(item)),
+            [
+              "stamina",
+              "velocity",
+              "control",
+              "breaking",
+              "contact",
+              "power",
+              "speed",
+              "eye",
+              "range",
+              "fielding",
+              "arm",
+              "calling",
+            ].includes(String(item)),
           )))
     );
   }
@@ -54,7 +67,32 @@ function validPending(value: unknown): boolean {
         value.schoolLabel === "remain_university")
     );
   }
-  if (value.type === "contract") {
+  if (value.type === "scout_opportunity") {
+    return (
+      Array.isArray(value.offers) &&
+      value.offers.every(
+        (offer) =>
+          isRecord(offer) &&
+          typeof offer.id === "string" &&
+          [
+            "cpbl_tryout",
+            "cpbl_recommendation",
+            "npb_contract",
+            "mlb_contract",
+            "cpbl_direct",
+          ].includes(String(offer.kind)) &&
+          typeof offer.label === "string",
+      ) &&
+      ["continue_school", "join_amateur", "remain_amateur", "retire"].includes(
+        String(value.fallback),
+      )
+    );
+  }
+  if (
+    value.type === "contract" ||
+    value.type === "contract_terms" ||
+    value.type === "free_agent_market"
+  ) {
     return (
       Array.isArray(value.offers) &&
       value.offers.every(
@@ -66,6 +104,7 @@ function validPending(value: unknown): boolean {
       )
     );
   }
+  if (value.type === "free_agency_decision") return isFiniteNumber(value.homeBaseSalary);
   if (value.type === "life")
     return ["dating", "proposal", "anniversary", "temptation", "reconcile"].includes(
       String(value.eventId),
@@ -110,7 +149,83 @@ function validLife(value: unknown): boolean {
   );
 }
 
+function defaultScouting(): Record<string, unknown> {
+  return {
+    exposure: 0,
+    markets: {
+      cpbl: { internalRating: 0, tier: "unseen", lastEvaluatedYear: null },
+      npb: { internalRating: 0, tier: "unseen", lastEvaluatedYear: null },
+      mlb: { internalRating: 0, tier: "unseen", lastEvaluatedYear: null },
+    },
+    draftEligibility: "none",
+    draftAttempts: 0,
+    reports: [],
+  };
+}
+
+function validScouting(value: unknown): boolean {
+  if (!isRecord(value) || !hasFiniteNumbers(value, ["exposure", "draftAttempts"])) return false;
+  if (!isRecord(value.markets)) return false;
+  for (const market of ["cpbl", "npb", "mlb"] as const) {
+    const entry = value.markets[market];
+    if (
+      !isRecord(entry) ||
+      !isFiniteNumber(entry.internalRating) ||
+      !["unseen", "watchlist", "cross_check", "invited"].includes(String(entry.tier)) ||
+      !(entry.lastEvaluatedYear === null || isFiniteNumber(entry.lastEvaluatedYear))
+    )
+      return false;
+  }
+  return (
+    [
+      "none",
+      "tryout",
+      "coach_recommendation",
+      "club_recommendation",
+      "national_team_award",
+    ].includes(String(value.draftEligibility)) &&
+    Array.isArray(value.reports) &&
+    value.reports.length <= 8 &&
+    value.reports.every(
+      (report) =>
+        isRecord(report) &&
+        isFiniteNumber(report.year) &&
+        ["cpbl", "npb", "mlb"].includes(String(report.market)) &&
+        ["unseen", "watchlist", "cross_check", "invited"].includes(String(report.tier)) &&
+        typeof report.summary === "string" &&
+        typeof report.strength === "string" &&
+        typeof report.concern === "string",
+    )
+  );
+}
+
 function validSeason(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !hasFiniteNumbers(value, ["year", "age", "games"]) ||
+    typeof value.level !== "string" ||
+    typeof value.team !== "string" ||
+    typeof value.injured !== "string" ||
+    !isStringArray(value.awards)
+  )
+    return false;
+  if (value.kind === "hitter")
+    return (
+      hasFiniteNumbers(value, [
+        "plateAppearances",
+        "atBats",
+        "hits",
+        "homeRuns",
+        "rbis",
+        "walks",
+        "stolenBases",
+        "average",
+        "onBasePercentage",
+        "slugging",
+        "ops",
+        "defense",
+      ]) && typeof value.position === "string"
+    );
   return (
     isRecord(value) &&
     hasFiniteNumbers(value, [
@@ -128,11 +243,8 @@ function validSeason(value: unknown): boolean {
       "era",
       "whip",
     ]) &&
-    typeof value.level === "string" &&
-    typeof value.team === "string" &&
     typeof value.role === "string" &&
-    typeof value.injured === "string" &&
-    isStringArray(value.awards)
+    true
   );
 }
 
@@ -155,6 +267,15 @@ export function parseCareerSummary(value: unknown): CareerSummary | null {
       "totalEarnings",
     ]) ||
     !(decoded.bestEra === null || isFiniteNumber(decoded.bestEra)) ||
+    !(decoded.peakAnnualSalary === undefined || isFiniteNumber(decoded.peakAnnualSalary)) ||
+    !(decoded.lastAnnualSalary === undefined || isFiniteNumber(decoded.lastAnnualSalary)) ||
+    !(decoded.finalTeam === undefined || typeof decoded.finalTeam === "string") ||
+    !(decoded.finalLeague === undefined || typeof decoded.finalLeague === "string") ||
+    !(decoded.careerHighlights === undefined || isStringArray(decoded.careerHighlights)) ||
+    !(decoded.scoutingHighlights === undefined || isStringArray(decoded.scoutingHighlights)) ||
+    !(
+      decoded.highestScoutingTier === undefined || typeof decoded.highestScoutingTier === "string"
+    ) ||
     !isStringArray(decoded.honors) ||
     !isStringArray(decoded.traits) ||
     !(
@@ -181,11 +302,22 @@ export function parseCareerSummary(value: unknown): CareerSummary | null {
 }
 
 export function migrateCareerState(value: unknown): CareerState {
-  const decoded = decodeJsonValue(value, "Career state");
-  if (!isRecord(decoded)) throw new Error("Career state must be an object");
-  if (![1, 2, STATE_SCHEMA_VERSION].includes(Number(decoded.schemaVersion))) {
+  const decodedValue = decodeJsonValue(value, "Career state");
+  if (!isRecord(decodedValue)) throw new Error("Career state must be an object");
+  const decoded = structuredClone(decodedValue);
+  if (![1, 2, 3, STATE_SCHEMA_VERSION].includes(Number(decoded.schemaVersion))) {
     throw new Error(`Unsupported career state schema: ${String(decoded.schemaVersion)}`);
   }
+  if (Number(decoded.schemaVersion) === STATE_SCHEMA_VERSION && decoded.scouting === undefined)
+    decoded.scouting = defaultScouting();
+  const positionGroup =
+    typeof decoded.positionGroup === "string" ? decoded.positionGroup : "pitcher";
+  const abilityKeys =
+    positionGroup === "pitcher"
+      ? ["stamina", "velocity", "control", "breaking"]
+      : positionGroup === "catcher"
+        ? ["stamina", "contact", "power", "speed", "eye", "range", "fielding", "arm", "calling"]
+        : ["stamina", "contact", "power", "speed", "eye", "range", "fielding", "arm"];
   const valid =
     typeof decoded.engineVersion === "string" &&
     typeof decoded.upstreamCommit === "string" &&
@@ -198,9 +330,9 @@ export function migrateCareerState(value: unknown): CareerState {
     typeof decoded.team === "string" &&
     typeof decoded.role === "string" &&
     typeof decoded.pitchEffort === "string" &&
-    hasFiniteNumbers(decoded.abilities, ["stamina", "velocity", "control", "breaking"]) &&
-    hasFiniteNumbers(decoded.potential, ["stamina", "velocity", "control", "breaking"]) &&
-    hasFiniteNumbers(decoded.trainingCarry, ["stamina", "velocity", "control", "breaking"]) &&
+    hasFiniteNumbers(decoded.abilities, abilityKeys) &&
+    hasFiniteNumbers(decoded.potential, abilityKeys) &&
+    hasFiniteNumbers(decoded.trainingCarry, abilityKeys) &&
     hasBooleans(decoded.traits, [
       "genius",
       "fragile",
@@ -230,6 +362,7 @@ export function migrateCareerState(value: unknown): CareerState {
     isStringArray(decoded.honors) &&
     isStringArray(decoded.lastOutcome) &&
     validPending(decoded.pending) &&
+    (decoded.schemaVersion !== STATE_SCHEMA_VERSION || validScouting(decoded.scouting)) &&
     (decoded.schemaVersion === 1 ||
       (validLife(decoded.life) &&
         isFiniteNumber(decoded.offseasonFatigue) &&

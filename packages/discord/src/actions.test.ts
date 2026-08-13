@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { ActiveCareerExistsError, DomainError, ExpectedStateError } from "@yakyulife/core";
 import { actionFromKey, parseCareerCustomId, toCustomId } from "./actions.ts";
+import { careerErrorSeverity } from "./feature.ts";
 
 describe("career component IDs", () => {
   test("contains only career id, revision and action key", () => {
@@ -23,5 +25,25 @@ describe("career component IDs", () => {
   test("rejects malformed values", () => {
     expect(parseCareerCustomId("career:owner:full-state")).toBeNull();
     expect(actionFromKey("unknown")).toBeNull();
+  });
+
+  test("maps v0.4 hitter training and FA actions", () => {
+    expect(actionFromKey("die_contact")).toEqual({
+      type: "assign_training_die",
+      ability: "contact",
+    });
+    expect(actionFromKey("die_calling")).toEqual({
+      type: "assign_training_die",
+      ability: "calling",
+    });
+    expect(actionFromKey("fa_market")).toEqual({ type: "choose_free_agency", choice: "market" });
+    expect(actionFromKey("fa_home")).toEqual({ type: "choose_free_agency", choice: "home" });
+  });
+
+  test("classifies expected product rejections without error logging", () => {
+    expect(careerErrorSeverity(new ActiveCareerExistsError())).toBe("info");
+    expect(careerErrorSeverity(new ExpectedStateError("邀請已過期"))).toBe("info");
+    expect(careerErrorSeverity(new DomainError("stale"))).toBe("warn");
+    expect(careerErrorSeverity(new Error("database"))).toBe("error");
   });
 });

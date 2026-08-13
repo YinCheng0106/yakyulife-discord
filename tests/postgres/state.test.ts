@@ -13,6 +13,15 @@ describe("persisted state boundary", () => {
     expect(parseCareerState(JSON.stringify(state))).toEqual(state);
   });
 
+  test("fills scouting defaults for schema four development states", () => {
+    const state = createCareerState("開發中狀態", "schema-four-default");
+    delete state.scouting;
+    const parsed = parseCareerState(state);
+    expect(parsed.scouting?.exposure).toBe(0);
+    expect(parsed.scouting?.markets.cpbl.tier).toBe("unseen");
+    expect(parsed.scouting?.reports).toEqual([]);
+  });
+
   test("continues accepting legacy state without modern life fields", () => {
     const state = createCareerState("舊版邊界", "state-v1", LEGACY_ENGINE_VERSION);
     expect(parseCareerState(structuredClone(state))).toEqual(state);
