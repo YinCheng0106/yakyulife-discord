@@ -15,6 +15,7 @@ import { SQL } from "bun";
 import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import { loadConfig } from "./config.ts";
 import { createLogger } from "./logger.ts";
+import { verifyPostgresConnection } from "./postgres-health.ts";
 
 const config = loadConfig();
 const logger = createLogger(config.logLevel);
@@ -48,7 +49,14 @@ client.once(Events.ClientReady, (readyClient) => {
 client.on(Events.Error, (error) => logger.error("Discord client error", error));
 client.on(Events.Warn, (message) => logger.warn("Discord client warning", { message }));
 
-await sql`select 1 as healthy`;
+await verifyPostgresConnection(() => sql`select 1 as healthy`, {
+  onRetry: ({ attempt, delayMilliseconds, code }) =>
+    logger.warn("Transient PostgreSQL startup failure; retrying", {
+      attempt,
+      delayMilliseconds,
+      code,
+    }),
+});
 await client.login(config.discordToken);
 
 async function maintainSalaryDuels(): Promise<void> {
