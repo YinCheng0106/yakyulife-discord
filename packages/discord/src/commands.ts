@@ -61,7 +61,8 @@ export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] =
             .addStringOption((option) =>
               option
                 .setName("position")
-                .setDescription("雙方守位類別")
+                .setNameLocalizations({ "zh-TW" : "守位"})
+                .setDescription("設定雙方守位類別")
                 .setRequired(true)
                 .addChoices(
                   { name: "投手", value: "pitcher" },
@@ -73,7 +74,8 @@ export const careerCommands: readonly RESTPostAPIApplicationCommandsJSONBody[] =
             .addStringOption((option) =>
               option
                 .setName("player-name")
-                .setDescription("球員姓名")
+                .setNameLocalizations({ "zh-TW": "球員姓名"})
+                .setDescription("設定球員姓名")
                 .setRequired(true)
                 .setMinLength(1)
                 .setMaxLength(10),
