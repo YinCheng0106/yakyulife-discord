@@ -44,7 +44,7 @@ describe("Discord rendering", () => {
   test("uses an explicit command registry for the career command", () => {
     expect(registeredCommandDefinitions).toHaveLength(1);
     expect(registeredCommandDefinitions[0]?.name).toBe("career");
-    expect(registeredCommandDefinitions).toEqual(careerCommands);
+    expect([...registeredCommandDefinitions]).toEqual([...careerCommands]);
   });
 
   test("renders a Components V2 career screen with attribution", () => {
