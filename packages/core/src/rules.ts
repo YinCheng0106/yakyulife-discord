@@ -1,3 +1,4 @@
+import { contentPack } from "@yakyulife/content";
 import type {
   AbilityKey,
   CareerState,
@@ -51,7 +52,8 @@ export interface LeagueRule {
   demotionOverall: number | null;
 }
 
-export const LEAGUE_RULES: Record<LeagueLevel, LeagueRule> = {
+/** Immutable v0.4 snapshot retained for historical career compatibility. */
+export const V04_LEAGUE_RULES: Record<LeagueLevel, LeagueRule> = {
   amateur: {
     league: "amateur",
     games: 30,
@@ -174,7 +176,9 @@ export const LEAGUE_RULES: Record<LeagueLevel, LeagueRule> = {
   },
 };
 
-export const LEAGUE_TEAMS: Record<LeagueKey, readonly string[]> = {
+export const LEAGUE_RULES = contentPack.leagues as unknown as Record<LeagueLevel, LeagueRule>;
+
+export const V04_LEAGUE_TEAMS: Record<LeagueKey, readonly string[]> = {
   amateur: [],
   cpbl: ["台中猛瑪", "府城雄獅", "桃園金剛", "新北騎士", "台北恐龍", "高雄神鵰"],
   npb: ["東京白鷺", "大阪烈牛", "北海道雪狐", "福岡海星", "名古屋金鯱", "仙台青葉"],
@@ -194,6 +198,12 @@ export const LEAGUE_TEAMS: Record<LeagueKey, readonly string[]> = {
   abl: ["雪梨灣鯊", "布里斯本笑翠鳥", "阿德雷德袋鼠", "伯斯沙暴"],
   international: ["中華隊"],
 };
+
+export const LEAGUE_TEAMS = contentPack.teams.leagues as unknown as Record<
+  LeagueKey,
+  readonly string[]
+>;
+export const MLB_DIVISIONS = contentPack.teams.mlbDivisions;
 
 export const ROLE_LABELS = {
   starter: "先發",
@@ -261,7 +271,7 @@ export function positionThreshold(
   return base - (age < 24 ? 3 : age < 26 ? 1.5 : 0);
 }
 
-export const TRAIT_LABELS = {
+const V04_TRAIT_LABELS = {
   genius: "天才",
   fragile: "玻璃人",
   iron_man: "鐵人",
@@ -270,6 +280,8 @@ export const TRAIT_LABELS = {
   clutch: "大心臟",
   rubber_arm: "橡膠手臂",
 } as const;
+
+export const TRAIT_LABELS = contentPack.traits as typeof V04_TRAIT_LABELS;
 
 export interface CareerEventRule {
   id: string;
@@ -283,7 +295,8 @@ export interface CareerEventRule {
   choiceLabels?: readonly [string, string, string?];
 }
 
-export const CAREER_EVENTS: readonly CareerEventRule[] = [
+/** Immutable v0.4 snapshot retained for historical career compatibility. */
+export const V04_CAREER_EVENTS: readonly CareerEventRule[] = [
   {
     id: "batting_machine",
     title: "打擊機特訓",
@@ -458,7 +471,9 @@ export const CAREER_EVENTS: readonly CareerEventRule[] = [
   },
 ] as const;
 
-export const STRATEGY_CONFIG: Record<
+export const CAREER_EVENTS = contentPack.events as unknown as readonly CareerEventRule[];
+
+const V04_STRATEGY_CONFIG: Record<
   EventStrategy,
   { successChance: number; magnitude: number; label: string }
 > = {
@@ -467,7 +482,9 @@ export const STRATEGY_CONFIG: Record<
   bold: { successChance: 35, magnitude: 3, label: "全力一搏" },
 };
 
-export const EFFORT_CONFIG: Record<
+export const STRATEGY_CONFIG = contentPack.balance.strategy as typeof V04_STRATEGY_CONFIG;
+
+const V04_EFFORT_CONFIG: Record<
   PitchEffort,
   { performance: number; tjMultiplier: number; label: string }
 > = {
@@ -476,13 +493,18 @@ export const EFFORT_CONFIG: Record<
   easy: { performance: -1, tjMultiplier: 0.65, label: "養生球" },
 };
 
-export const LEAGUE_THRESHOLDS = {
+export const EFFORT_CONFIG = contentPack.balance.effort as typeof V04_EFFORT_CONFIG;
+
+const V04_LEAGUE_THRESHOLDS = {
   cpbl1PromotionOverall: 41,
   cpbl2DemotionOverall: 39,
   forcedRetirementAge: 48,
 } as const;
 
-export const TRAIT_THRESHOLDS = {
+export const LEAGUE_THRESHOLDS = contentPack.balance
+  .thresholds as unknown as typeof V04_LEAGUE_THRESHOLDS;
+
+const V04_TRAIT_THRESHOLDS = {
   geniusSixesBefore22: 5,
   fragileMajorInjuries: 2,
   ironManHealthySeasons: 5,
@@ -493,6 +515,9 @@ export const TRAIT_THRESHOLDS = {
   clutchBoldSuccesses: 3,
   rubberArmInjections: 2,
 } as const;
+
+export const TRAIT_THRESHOLDS = contentPack.balance
+  .thresholds as unknown as typeof V04_TRAIT_THRESHOLDS;
 
 export function overall(state: CareerState): number {
   if ((state.positionGroup ?? "pitcher") === "pitcher") {

@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { CONTENT_PACK_HASH, CONTENT_PACK_VERSION } from "@yakyulife/content";
 import {
   CAREER_EVENTS,
   createCareerState,
+  ENGINE_VERSION,
+  FOUR_POSITION_ENGINE_VERSION,
   type GameAction,
   keyedRandom,
   LEAGUE_RULES,
@@ -20,6 +23,16 @@ describe("career engine", () => {
     expect(left).toEqual(right);
     const action = { type: "assign_training_die", ability: "velocity" } as const;
     expect(reduceCareer(left, action)).toEqual(reduceCareer(right, action));
+  });
+
+  test("pins the v0.5 content pack while preserving v0.4 state shape", () => {
+    const current = createCareerState("內容投手", "content-pin");
+    const v04 = createCareerState("舊版投手", "v04-pin", FOUR_POSITION_ENGINE_VERSION);
+    expect(current.engineVersion).toBe(ENGINE_VERSION);
+    expect(current.contentPackVersion).toBe(CONTENT_PACK_VERSION);
+    expect(current.contentHash).toBe(CONTENT_PACK_HASH);
+    expect(v04.contentPackVersion).toBeUndefined();
+    expect(v04.contentHash).toBeUndefined();
   });
 
   test("matches the versioned golden fixture", () => {

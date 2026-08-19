@@ -1,3 +1,4 @@
+import { contentPack } from "@yakyulife/content";
 import {
   type CareerRecord,
   type CareerSummary,
@@ -83,13 +84,15 @@ export function createShareCardViewModel(summary: CareerSummary): ShareCardViewM
     statLines,
     honors: clipped(summary.honors, 5),
     traits: clipped(
-      summary.traits.map((trait) => TRAIT_LABELS[trait]),
+      summary.traits.map((trait) => contentPack.traits[trait] ?? TRAIT_LABELS[trait]),
       6,
     ),
     family,
     scouting: `最高球探分級：${scoutingTier}`,
     seed: summary.seed,
-    engine: summary.engineVersion,
+    engine: summary.contentPackVersion
+      ? `${summary.engineVersion} · Content ${summary.contentPackVersion}`
+      : summary.engineVersion,
     ending: summary.ending,
     highlights: clipped(
       [...(summary.scoutingHighlights ?? []).slice(-1), ...(summary.careerHighlights ?? [])],

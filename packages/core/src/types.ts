@@ -1,10 +1,11 @@
 export const LEGACY_ENGINE_VERSION = "0.1.0";
 export const CORE_ENGINE_VERSION = "0.2.0";
 export const MULTI_LEAGUE_ENGINE_VERSION = "0.3.0";
-export const ENGINE_VERSION = "0.4.0";
+export const FOUR_POSITION_ENGINE_VERSION = "0.4.0";
+export const ENGINE_VERSION = "0.5.0";
 export const UPSTREAM_COMMIT = "d3880c2996e7b418e2a3518a00cf69956c7ef9d9";
 export const LEGACY_UPSTREAM_COMMIT = "913cad27db86bda79cbd53dc5666ab15d28c5d2d";
-export const STATE_SCHEMA_VERSION = 4;
+export const STATE_SCHEMA_VERSION = 5;
 export const SALARY_DUEL_RULESET_VERSION = "salary-duel-v1";
 
 export const ENGINE_METADATA = {
@@ -22,6 +23,11 @@ export const ENGINE_METADATA = {
     schemaVersion: 3,
     upstreamCommit: LEGACY_UPSTREAM_COMMIT,
     rngMode: "cursor",
+  },
+  [FOUR_POSITION_ENGINE_VERSION]: {
+    schemaVersion: 4,
+    upstreamCommit: UPSTREAM_COMMIT,
+    rngMode: "keyed",
   },
   [ENGINE_VERSION]: {
     schemaVersion: STATE_SCHEMA_VERSION,
@@ -288,6 +294,8 @@ export interface CareerSummary {
   ending: string;
   seed: string;
   engineVersion: string;
+  contentPackVersion?: string;
+  contentHash?: string;
   leagueTotals?: Array<{
     league: LeagueKey;
     seasons: number;
@@ -431,6 +439,8 @@ export type PendingDecision =
 export interface CareerState {
   schemaVersion: number;
   engineVersion: string;
+  contentPackVersion?: string;
+  contentHash?: string;
   upstreamCommit: string;
   seed: string;
   rngState: number;

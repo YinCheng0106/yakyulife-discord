@@ -10,6 +10,7 @@ import {
   type CommitActionInput,
   type CommitActionResult,
   ENGINE_VERSION,
+  FOUR_POSITION_ENGINE_VERSION,
   LEGACY_ENGINE_VERSION,
   MULTI_LEAGUE_ENGINE_VERSION,
   type NewCareerInput,
@@ -36,11 +37,13 @@ export class CareerService {
         LEGACY_ENGINE_VERSION,
         CORE_ENGINE_VERSION,
         MULTI_LEAGUE_ENGINE_VERSION,
+        FOUR_POSITION_ENGINE_VERSION,
         ENGINE_VERSION,
       ].includes(this.newCareerEngineVersion)
     )
       throw new DomainError("不支援的新生涯 engine 版本");
     if (
+      this.newCareerEngineVersion !== FOUR_POSITION_ENGINE_VERSION &&
       this.newCareerEngineVersion !== ENGINE_VERSION &&
       input.positionGroup &&
       input.positionGroup !== "pitcher"

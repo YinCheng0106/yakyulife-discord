@@ -1,3 +1,4 @@
+import { CONTENT_PACK_HASH } from "@yakyulife/content";
 import { ActiveCareerExistsError, DomainError } from "./errors.ts";
 import type { Clock, IdGenerator, SalaryDuelRepository } from "./ports.ts";
 import {
@@ -6,6 +7,8 @@ import {
   SALARY_DUEL_RULESET_VERSION,
   type SalaryDuel,
 } from "./types.ts";
+
+export const CURRENT_SALARY_DUEL_RULESET_VERSION = `${SALARY_DUEL_RULESET_VERSION}:${CONTENT_PACK_HASH}`;
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -58,7 +61,7 @@ export class SalaryDuelService {
       inviteCodeHash: sha256(inviteCode),
       inviteExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
       engineVersion: ENGINE_VERSION,
-      rulesetVersion: SALARY_DUEL_RULESET_VERSION,
+      rulesetVersion: CURRENT_SALARY_DUEL_RULESET_VERSION,
     });
     return { duel, inviteCode };
   }

@@ -257,6 +257,8 @@ export function parseCareerSummary(value: unknown): CareerSummary | null {
     typeof decoded.ending !== "string" ||
     typeof decoded.seed !== "string" ||
     typeof decoded.engineVersion !== "string" ||
+    !(decoded.contentPackVersion === undefined || typeof decoded.contentPackVersion === "string") ||
+    !(decoded.contentHash === undefined || typeof decoded.contentHash === "string") ||
     !hasFiniteNumbers(decoded, [
       "finalAge",
       "seasons",
@@ -305,7 +307,7 @@ export function migrateCareerState(value: unknown): CareerState {
   const decodedValue = decodeJsonValue(value, "Career state");
   if (!isRecord(decodedValue)) throw new Error("Career state must be an object");
   const decoded = structuredClone(decodedValue);
-  if (![1, 2, 3, STATE_SCHEMA_VERSION].includes(Number(decoded.schemaVersion))) {
+  if (![1, 2, 3, 4, STATE_SCHEMA_VERSION].includes(Number(decoded.schemaVersion))) {
     throw new Error(`Unsupported career state schema: ${String(decoded.schemaVersion)}`);
   }
   if (Number(decoded.schemaVersion) === STATE_SCHEMA_VERSION && decoded.scouting === undefined)
@@ -362,7 +364,10 @@ export function migrateCareerState(value: unknown): CareerState {
     isStringArray(decoded.honors) &&
     isStringArray(decoded.lastOutcome) &&
     validPending(decoded.pending) &&
-    (decoded.schemaVersion !== STATE_SCHEMA_VERSION || validScouting(decoded.scouting)) &&
+    (Number(decoded.schemaVersion) < 4 || validScouting(decoded.scouting)) &&
+    (Number(decoded.schemaVersion) !== STATE_SCHEMA_VERSION ||
+      (typeof decoded.contentPackVersion === "string" &&
+        typeof decoded.contentHash === "string")) &&
     (decoded.schemaVersion === 1 ||
       (validLife(decoded.life) &&
         isFiniteNumber(decoded.offseasonFatigue) &&

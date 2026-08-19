@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   type CareerRecord,
+  CURRENT_SALARY_DUEL_RULESET_VERSION,
   createInviteCode,
   ENGINE_VERSION,
   type JoinSalaryDuelInput,
   type NewSalaryDuelInput,
   normalizeInviteCode,
-  SALARY_DUEL_RULESET_VERSION,
   type SalaryDuel,
   type SalaryDuelRepository,
   SalaryDuelService,
@@ -106,7 +106,7 @@ describe("salary duel service", () => {
     });
     expect(created.inviteCode).toHaveLength(12);
     expect(created.duel.engineVersion).toBe(ENGINE_VERSION);
-    expect(created.duel.rulesetVersion).toBe(SALARY_DUEL_RULESET_VERSION);
+    expect(created.duel.rulesetVersion).toBe(CURRENT_SALARY_DUEL_RULESET_VERSION);
     expect(created.duel.inviteExpiresAt.toISOString()).toBe("2026-08-14T00:00:00.000Z");
   });
 });

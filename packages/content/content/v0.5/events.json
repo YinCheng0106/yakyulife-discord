@@ -1,0 +1,199 @@
+{
+  "version": "0.5.0",
+  "events": [
+    {
+      "id": "batting_machine",
+      "title": "打擊機特訓",
+      "description": "密集打擊練習可能校準擊球點，也可能讓姿勢走樣。",
+      "ability": "contact",
+      "eligiblePositions": ["catcher", "infielder", "outfielder"],
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "weight_cycle",
+      "title": "重量訓練週期",
+      "description": "挑戰重量訓練週期，成果與過度負荷只差一線。",
+      "ability": "stamina",
+      "injuryRisk": 3,
+      "effects": ["ability_delta", "injury_risk"]
+    },
+    {
+      "id": "bullpen_session",
+      "title": "牛棚加練",
+      "description": "投手教練提議調整握法，可能得到更銳利的變化球。",
+      "ability": "breaking",
+      "eligiblePositions": ["pitcher"],
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "long_toss",
+      "title": "長傳接訓練",
+      "description": "長傳訓練可能養成雷射肩，也可能造成肩部緊繃。",
+      "ability": "arm",
+      "injuryRisk": 4,
+      "eligiblePositions": ["catcher", "infielder", "outfielder"],
+      "effects": ["ability_delta", "injury_risk"]
+    },
+    {
+      "id": "video_room",
+      "title": "影像分析課",
+      "description": "看穿對手習性可以提升判斷，資訊過量也可能綁手綁腳。",
+      "ability": "eye",
+      "abilityByPosition": { "pitcher": "control", "catcher": "calling" },
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "base_running",
+      "title": "跑壘特訓",
+      "description": "起跑判讀的密集練習，同時帶來拉傷風險。",
+      "ability": "speed",
+      "injuryRisk": 5,
+      "eligiblePositions": ["catcher", "infielder", "outfielder"],
+      "effects": ["ability_delta", "injury_risk"]
+    },
+    {
+      "id": "thousand_grounders",
+      "title": "守備千球練習",
+      "description": "大量不規則彈跳球考驗接球穩定度與第一步。",
+      "ability": "fielding",
+      "eligiblePositions": ["catcher", "infielder", "outfielder"],
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "hit_by_pitch_scare",
+      "title": "觸身球驚魂",
+      "description": "突如其來的近身速球考驗反應，也可能造成傷勢。",
+      "ability": "speed",
+      "abilityByPosition": { "pitcher": "stamina" },
+      "injuryRisk": 12,
+      "effects": ["ability_delta", "injury_risk"]
+    },
+    {
+      "id": "media_interview",
+      "title": "媒體專訪",
+      "description": "公開受訪可能累積人氣，也可能讓壓力影響狀態。",
+      "ability": "stamina",
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "coaching_attention",
+      "title": "教練團關注",
+      "description": "單獨指導可能突破瓶頸，也可能被迫修改不合適的動作。",
+      "ability": "stamina",
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "nutrition_sleep",
+      "title": "伙食與睡眠計畫",
+      "description": "新的飲食與睡眠規劃可能改善恢復，也可能因適應不良中斷。",
+      "ability": "stamina",
+      "injuryRisk": 4,
+      "effects": ["ability_delta", "injury_risk"]
+    },
+    {
+      "id": "veteran_advice",
+      "title": "學長／老將指點",
+      "description": "前輩的一句話可能點醒你，也可能讓你繞上遠路。",
+      "ability": "stamina",
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "velocity_day",
+      "title": "球速測定日",
+      "description": "雷達槍已架好；全力催球可能突破，也可能讓手肘發炎。",
+      "ability": "velocity",
+      "injuryRisk": 10,
+      "eligiblePositions": ["pitcher"],
+      "effects": ["ability_delta", "injury_risk"]
+    },
+    {
+      "id": "pitch_calling_study",
+      "title": "配球讀書會",
+      "description": "研究進壘點與配球邏輯，資訊也可能造成猶豫。",
+      "ability": "control",
+      "eligiblePositions": ["pitcher"],
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "late_night_food",
+      "title": "宵夜文化",
+      "description": "球隊聚餐帶來凝聚力，也考驗體態與第一步。",
+      "ability": "stamina",
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "endorsement_offer",
+      "title": "場外代言邀約",
+      "description": "商演能增加收入與曝光，過密行程也會壓縮訓練。",
+      "ability": "stamina",
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "midseason_slump",
+      "title": "季中低潮",
+      "description": "調整心態可能走出低潮，也可能讓低迷延續整月。",
+      "ability": "eye",
+      "abilityByPosition": { "pitcher": "control" },
+      "effects": ["ability_delta"]
+    },
+    {
+      "id": "catcher_collision",
+      "title": "捕手本壘攻防",
+      "description": "偏傳迫使你在本壘前做出合法且即時的處理。",
+      "ability": "fielding",
+      "eligiblePositions": ["catcher"],
+      "sourceNote": "CPBL Official Baseball Rules 6.01(i)",
+      "choiceLabels": ["穩接再觸殺", "移位接偏傳、拚瞬間觸殺"],
+      "effects": ["special_case"]
+    },
+    {
+      "id": "double_play_turn",
+      "title": "二壘雙殺轉傳",
+      "description": "跑者滑向二壘，你必須在合法滑壘路徑旁完成轉傳。",
+      "ability": "fielding",
+      "eligiblePositions": ["infielder"],
+      "sourceNote": "Official Baseball Rule 6.01(j)",
+      "choiceLabels": ["踩壘避開跑者、穩傳一壘", "逆向快轉、拚完整雙殺"],
+      "effects": ["special_case"]
+    },
+    {
+      "id": "wall_catch",
+      "title": "全壘打牆前深遠飛球",
+      "description": "飛球一路往牆邊延伸，安全處理與美技只差一步。",
+      "ability": "range",
+      "injuryRisk": 12,
+      "eligiblePositions": ["outfielder"],
+      "sourceNote": "CPBL wall-catch injury reports",
+      "choiceLabels": ["卡位、單跳球處理", "全速追球、拚牆前接殺"],
+      "effects": ["special_case"]
+    },
+    {
+      "id": "rain_makeup",
+      "title": "雨延後的補賽週",
+      "description": "密集補賽壓縮恢復時間，球隊讓你決定本週負荷。",
+      "ability": "stamina",
+      "sourceNote": "CPBL postponement regulations",
+      "choiceLabels": ["接受輪休、保留體能", "爭取兩戰都先發"],
+      "effects": ["special_case"]
+    },
+    {
+      "id": "position_role_meeting",
+      "title": "守位定位會議",
+      "description": "教練團討論新球季的守位定位，請你在專精與多功能之間做選擇。",
+      "ability": "fielding",
+      "eligiblePositions": ["catcher", "infielder", "outfielder"],
+      "sourceNote": "Fictional position-development meeting",
+      "choiceLabels": ["爭取固定守位", "接受多守位調度"],
+      "effects": ["special_case"]
+    },
+    {
+      "id": "family_tournament_conflict",
+      "title": "國際賽與重要家庭日撞期",
+      "description": "國際賽徵召恰好撞上重要家庭日；兩條路都有真實代價。",
+      "ability": "stamina",
+      "sourceNote": "Inspired by a publicly documented WBSC Premier12 scheduling conflict; fictionalized",
+      "choiceLabels": ["🏠 家庭還是比較重要", "⚾ 棒球還是比較重要"],
+      "effects": ["special_case"]
+    }
+  ]
+}

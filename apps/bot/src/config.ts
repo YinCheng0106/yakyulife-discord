@@ -2,6 +2,7 @@ import {
   CORE_ENGINE_VERSION,
   DomainError,
   ENGINE_VERSION,
+  FOUR_POSITION_ENGINE_VERSION,
   LEGACY_ENGINE_VERSION,
   MULTI_LEAGUE_ENGINE_VERSION,
 } from "@yakyulife/core";
@@ -35,6 +36,7 @@ export function loadConfig(): BotConfig {
       LEGACY_ENGINE_VERSION,
       CORE_ENGINE_VERSION,
       MULTI_LEAGUE_ENGINE_VERSION,
+      FOUR_POSITION_ENGINE_VERSION,
       ENGINE_VERSION,
     ].includes(careerEngineVersion)
   )

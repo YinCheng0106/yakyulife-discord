@@ -1,3 +1,4 @@
+import { CONTENT_PACK_HASH, CONTENT_PACK_VERSION } from "@yakyulife/content";
 import { DomainError } from "./errors.ts";
 import { chance, initialRngState, keyedRandom, pick, random, randomInt } from "./rng.ts";
 import {
@@ -17,16 +18,20 @@ import {
   positionThreshold,
   STRATEGY_CONFIG,
   TRAIT_THRESHOLDS,
+  V04_CAREER_EVENTS,
+  V04_LEAGUE_TEAMS,
 } from "./rules.ts";
 import {
   type AbilityKey,
   type AbilitySet,
   type CareerState,
   type CareerSummary,
+  CORE_ENGINE_VERSION,
   type DefensivePosition,
   ENGINE_VERSION,
   type EngineEvent,
   type EngineResult,
+  FOUR_POSITION_ENGINE_VERSION,
   type GameAction,
   LEGACY_ENGINE_VERSION,
   LEGACY_UPSTREAM_COMMIT,
@@ -110,12 +115,24 @@ function initialScoutingState(): ScoutingState {
 
 function supportsExpandedCareer(state: CareerState): boolean {
   return (
-    state.engineVersion === MULTI_LEAGUE_ENGINE_VERSION || state.engineVersion === ENGINE_VERSION
+    state.engineVersion === MULTI_LEAGUE_ENGINE_VERSION ||
+    state.engineVersion === FOUR_POSITION_ENGINE_VERSION ||
+    state.engineVersion === ENGINE_VERSION
   );
 }
 
 function supportsFourPositions(state: CareerState): boolean {
-  return state.engineVersion === ENGINE_VERSION;
+  return (
+    state.engineVersion === FOUR_POSITION_ENGINE_VERSION || state.engineVersion === ENGINE_VERSION
+  );
+}
+
+function leagueTeams(state: CareerState, league: keyof typeof LEAGUE_TEAMS): readonly string[] {
+  return state.engineVersion === ENGINE_VERSION ? LEAGUE_TEAMS[league] : V04_LEAGUE_TEAMS[league];
+}
+
+function rulesetKey(state: CareerState): string {
+  return state.contentHash ?? SALARY_DUEL_RULESET_VERSION;
 }
 
 function abilityKeys(state: Pick<CareerState, "positionGroup">): readonly AbilityKey[] {
@@ -127,7 +144,9 @@ function abilityKeys(state: Pick<CareerState, "positionGroup">): readonly Abilit
 
 function eligibleCareerEvents(state: CareerState) {
   if (!supportsFourPositions(state)) return LEGACY_CAREER_EVENTS;
-  return CAREER_EVENTS.filter(
+  const events =
+    state.engineVersion === FOUR_POSITION_ENGINE_VERSION ? V04_CAREER_EVENTS : CAREER_EVENTS;
+  return events.filter(
     (event) =>
       !event.eligiblePositions ||
       event.eligiblePositions.includes(state.positionGroup ?? "pitcher"),
@@ -139,7 +158,7 @@ function worldRandom(state: CareerState, context: string, drawKey: string): numb
   return keyedRandom(
     state.seed,
     state.engineVersion,
-    SALARY_DUEL_RULESET_VERSION,
+    rulesetKey(state),
     state.positionGroup ?? "pitcher",
     state.year,
     "world",
@@ -170,7 +189,7 @@ function keyedChance(
     keyedRandom(
       state.seed,
       state.engineVersion,
-      SALARY_DUEL_RULESET_VERSION,
+      rulesetKey(state),
       state.positionGroup ?? "pitcher",
       state.year,
       stream,
@@ -281,12 +300,28 @@ export function createCareerState(
   engineVersion: string = ENGINE_VERSION,
   positionGroup: PositionGroup = "pitcher",
 ): CareerState {
-  if (engineVersion !== ENGINE_VERSION) positionGroup = "pitcher";
+  if (engineVersion !== FOUR_POSITION_ENGINE_VERSION && engineVersion !== ENGINE_VERSION)
+    positionGroup = "pitcher";
   const normalizedSeed = seed.trim().slice(0, 24) || "yakyulife";
   const state: CareerState = {
-    schemaVersion: engineVersion === LEGACY_ENGINE_VERSION ? 1 : STATE_SCHEMA_VERSION,
+    schemaVersion:
+      engineVersion === LEGACY_ENGINE_VERSION
+        ? 1
+        : engineVersion === CORE_ENGINE_VERSION
+          ? 2
+          : engineVersion === MULTI_LEAGUE_ENGINE_VERSION
+            ? 3
+            : engineVersion === FOUR_POSITION_ENGINE_VERSION
+              ? 4
+              : STATE_SCHEMA_VERSION,
     engineVersion,
-    upstreamCommit: engineVersion === ENGINE_VERSION ? UPSTREAM_COMMIT : LEGACY_UPSTREAM_COMMIT,
+    upstreamCommit:
+      engineVersion === FOUR_POSITION_ENGINE_VERSION || engineVersion === ENGINE_VERSION
+        ? UPSTREAM_COMMIT
+        : LEGACY_UPSTREAM_COMMIT,
+    ...(engineVersion === ENGINE_VERSION
+      ? { contentPackVersion: CONTENT_PACK_VERSION, contentHash: CONTENT_PACK_HASH }
+      : {}),
     seed: normalizedSeed,
     rngState: initialRngState(normalizedSeed),
     positionGroup,
@@ -369,7 +404,7 @@ export function createCareerState(
       },
     ];
   }
-  if (engineVersion !== ENGINE_VERSION) {
+  if (engineVersion !== FOUR_POSITION_ENGINE_VERSION && engineVersion !== ENGINE_VERSION) {
     delete state.positionGroup;
     delete state.primaryPosition;
     delete state.utilityRole;
@@ -530,8 +565,10 @@ function choosePitchEffort(
   createTrainingDecision(state);
 }
 
-function eventRule(eventId: string) {
-  const rule = [...LEGACY_CAREER_EVENTS, ...CAREER_EVENTS].find((event) => event.id === eventId);
+function eventRule(state: CareerState, eventId: string) {
+  const versionedEvents =
+    state.engineVersion === FOUR_POSITION_ENGINE_VERSION ? V04_CAREER_EVENTS : CAREER_EVENTS;
+  const rule = [...LEGACY_CAREER_EVENTS, ...versionedEvents].find((event) => event.id === eventId);
   if (!rule) throw new DomainError("找不到事件規則");
   return rule;
 }
@@ -542,7 +579,7 @@ function chooseEvent(
   events: string[],
 ): void {
   if (state.pending?.type !== "event") throw new DomainError("目前沒有等待處理的事件");
-  const rule = eventRule(state.pending.eventId);
+  const rule = eventRule(state, state.pending.eventId);
   const adjust = (ability: AbilityKey, delta: number): void => {
     state.abilities[ability] = clamp((state.abilities[ability] ?? 0) + delta, 1, 80);
   };
@@ -1040,8 +1077,8 @@ function maybeOfferAbl(state: CareerState, events: string[]): void {
     state.pending = {
       type: "abl",
       team: supportsFourPositions(state)
-        ? worldPick(state, "abl-team", LEAGUE_TEAMS.abl)
-        : pick(state, LEAGUE_TEAMS.abl),
+        ? worldPick(state, "abl-team", leagueTeams(state, "abl"))
+        : pick(state, leagueTeams(state, "abl")),
       mode: "offseason",
     };
     return;
@@ -1330,8 +1367,12 @@ function contractOffers(state: CareerState): Array<{
     : pick(state, levelCandidates);
   const targetRule = LEAGUE_RULES[level];
   const team = supportsFourPositions(state)
-    ? worldPick(state, `fa-destination-team-${targetRule.league}`, LEAGUE_TEAMS[targetRule.league])
-    : pick(state, LEAGUE_TEAMS[targetRule.league]);
+    ? worldPick(
+        state,
+        `fa-destination-team-${targetRule.league}`,
+        leagueTeams(state, targetRule.league),
+      )
+    : pick(state, leagueTeams(state, targetRule.league));
   const source =
     state.contract.serviceYears >= 7
       ? "fa"
@@ -1454,7 +1495,7 @@ function evaluateScouting(state: CareerState, events: string[]): void {
     (keyedRandom(
       state.seed,
       state.engineVersion,
-      SALARY_DUEL_RULESET_VERSION,
+      rulesetKey(state),
       state.positionGroup ?? "pitcher",
       state.year,
       "career",
@@ -1560,7 +1601,7 @@ function scoutingOffers(state: CareerState): ScoutOffer[] {
       id: `cpbl-direct-${state.year}`,
       kind: "cpbl_direct",
       label: "三次落選後自由協商",
-      team: worldPick(state, "scout-cpbl-direct-team", LEAGUE_TEAMS.cpbl),
+      team: worldPick(state, "scout-cpbl-direct-team", leagueTeams(state, "cpbl")),
       level: "cpbl2",
       salary: 84,
       years: 1,
@@ -1585,7 +1626,7 @@ function scoutingOffers(state: CareerState): ScoutOffer[] {
       id: `npb-${state.year}`,
       kind: "npb_contract",
       label: "接受日職育成／二軍合約",
-      team: worldPick(state, "scout-npb-team", LEAGUE_TEAMS.npb),
+      team: worldPick(state, "scout-npb-team", leagueTeams(state, "npb")),
       level: "npb2",
       salary: 180,
       years: 2,
@@ -1597,7 +1638,7 @@ function scoutingOffers(state: CareerState): ScoutOffer[] {
       id: `mlb-${state.year}`,
       kind: "mlb_contract",
       label: `接受美職${mlb.internalRating >= 64 ? "1A" : "新人聯盟"}合約`,
-      team: worldPick(state, "scout-mlb-team", LEAGUE_TEAMS.mlb),
+      team: worldPick(state, "scout-mlb-team", leagueTeams(state, "mlb")),
       level: mlb.internalRating >= 64 ? "a" : "rookie",
       salary: mlb.internalRating >= 64 ? 240 : 150,
       years: 3,
@@ -1671,7 +1712,7 @@ function resolvePostSeason(state: CareerState, events: string[]): void {
     (supportsFourPositions(state) ? worldChance(state, "trade-window", 6) : chance(state, 6))
   ) {
     const league = LEAGUE_RULES[state.level].league;
-    const destinations = LEAGUE_TEAMS[league].filter((team) => team !== state.team);
+    const destinations = leagueTeams(state, league).filter((team) => team !== state.team);
     if (destinations.length > 0) {
       const formerTeam = state.team;
       state.team = supportsFourPositions(state)
@@ -1934,7 +1975,7 @@ function chooseDraft(
     signFirstProfessionalContract(
       state,
       {
-        team: worldPick(state, "cpbl-draft-team", LEAGUE_TEAMS.cpbl),
+        team: worldPick(state, "cpbl-draft-team", leagueTeams(state, "cpbl")),
         level,
         salary: level === "cpbl1" ? 300 : 84,
         years: 2,
@@ -1983,7 +2024,7 @@ function chooseDraft(
   state.stage = "professional";
   state.stageYear = 1;
   state.level = overall(state) >= 41 ? "cpbl1" : "cpbl2";
-  state.team = pick(state, LEAGUE_TEAMS.cpbl);
+  state.team = pick(state, leagueTeams(state, "cpbl"));
   state.contract = {
     annualSalary: state.level === "cpbl1" ? 300 : 84,
     yearsRemaining: 2,
@@ -2115,6 +2156,9 @@ function careerSummary(state: CareerState, ending: string): CareerSummary {
     ending,
     seed: state.seed,
     engineVersion: state.engineVersion,
+    ...(state.contentPackVersion && state.contentHash
+      ? { contentPackVersion: state.contentPackVersion, contentHash: state.contentHash }
+      : {}),
   };
   if (supportsFourPositions(state)) {
     summary.peakAnnualSalary = state.contract.peakAnnualSalary ?? state.contract.annualSalary;

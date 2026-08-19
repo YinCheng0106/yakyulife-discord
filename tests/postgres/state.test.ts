@@ -13,13 +13,20 @@ describe("persisted state boundary", () => {
     expect(parseCareerState(JSON.stringify(state))).toEqual(state);
   });
 
-  test("fills scouting defaults for schema four development states", () => {
+  test("fills scouting defaults for current development states", () => {
     const state = createCareerState("開發中狀態", "schema-four-default");
     delete state.scouting;
     const parsed = parseCareerState(state);
     expect(parsed.scouting?.exposure).toBe(0);
     expect(parsed.scouting?.markets.cpbl.tier).toBe("unseen");
     expect(parsed.scouting?.reports).toEqual([]);
+  });
+
+  test("requires the content fingerprint for v0.5 states", () => {
+    const state = createCareerState("內容邊界", "content-boundary");
+    const missingHash = { ...state };
+    delete missingHash.contentHash;
+    expect(() => parseCareerState(missingHash)).toThrow("structure is invalid");
   });
 
   test("continues accepting legacy state without modern life fields", () => {

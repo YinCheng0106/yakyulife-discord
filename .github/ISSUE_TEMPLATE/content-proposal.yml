@@ -1,0 +1,58 @@
+name: Content proposal
+description: Propose a fictional YaKyuLife event, balance adjustment, or content-pack change.
+title: "content: "
+labels: ["content-proposal"]
+body:
+  - type: dropdown
+    id: inspiration
+    attributes:
+      label: 類型
+      options:
+        - 真實事件靈感（附公開來源）
+        - 原創架空事件
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: 公開來源（原創可填「不適用」）
+      description: 真實事件靈感請提供可公開查證的 URL；不會直接將真人或真實球隊寫入遊戲。
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 事件情境與選項
+      description: 請以架空球員與架空球隊撰寫，包含玩家可選的處理方式。
+    validations:
+      required: true
+  - type: textarea
+    id: eligibility
+    attributes:
+      label: 適用條件
+      description: 例如守位、聯盟層級、年齡或生涯階段。
+    validations:
+      required: true
+  - type: dropdown
+    id: effect
+    attributes:
+      label: 預期效果類型
+      options:
+        - 能力變化
+        - 傷病風險
+        - 當季出賽或守備修正
+        - 既有特殊事件效果
+    validations:
+      required: true
+  - type: textarea
+    id: balance
+    attributes:
+      label: 平衡意圖
+      description: 說明成功與失敗的代價，以及為什麼不會變成必選事件。
+    validations:
+      required: true
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: 確認
+      options:
+        - label: 我同意維護者將提案改寫成架空內容、調整數值或拒絕發布。
+          required: true

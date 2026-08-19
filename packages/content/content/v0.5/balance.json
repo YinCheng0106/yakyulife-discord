@@ -1,0 +1,27 @@
+{
+  "version": "0.5.0",
+  "strategy": {
+    "safe": { "successChance": 70, "magnitude": 1, "label": "保守應對" },
+    "normal": { "successChance": 50, "magnitude": 2, "label": "照常執行" },
+    "bold": { "successChance": 35, "magnitude": 3, "label": "全力一搏" }
+  },
+  "effort": {
+    "full": { "performance": 1, "tjMultiplier": 1.25, "label": "全力投" },
+    "normal": { "performance": 0, "tjMultiplier": 1, "label": "普通投" },
+    "easy": { "performance": -1, "tjMultiplier": 0.65, "label": "養生球" }
+  },
+  "thresholds": {
+    "cpbl1PromotionOverall": 41,
+    "cpbl2DemotionOverall": 39,
+    "forcedRetirementAge": 48,
+    "geniusSixesBefore22": 5,
+    "fragileMajorInjuries": 2,
+    "ironManHealthySeasons": 5,
+    "lateBloomerMinimumAge": 25,
+    "lateBloomerMaximumOverall": 46,
+    "lateBloomerChance": 18,
+    "disciplinedChoices": 3,
+    "clutchBoldSuccesses": 3,
+    "rubberArmInjections": 2
+  }
+}

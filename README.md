@@ -9,6 +9,7 @@ YaKyuLife Discord Bot 是以 Bun 1.3.14、TypeScript ESM、Discord.js 與 Supaba
 ```text
 apps/bot                 Discord client、composition root、health endpoint
 packages/core            純 TypeScript reducer、規則、ports、use cases
+packages/content         版本化 JSON Content Pack、Zod schema、內容 hash
 packages/postgres        Bun.SQL repository、row lock、revision、state 邊界驗證
 packages/discord         Commands、Components V2、renderers、PNG 分享卡
 supabase/migrations      唯一正式 schema 來源
@@ -96,6 +97,8 @@ bun run db:verify
 - 球探只讀取已展現能力、當季成績、年齡、守位需求與健康，不讀取隱藏潛力；UI 只顯示文字分級，內部評價不會公開。
 - 中職新人路線以推薦／測試會、選秀及三次落選後自由協商呈現；這是依現行制度做的遊戲化簡化。日職與美職球探達門檻後可提出架空球隊合約。
 
-`CAREER_ENGINE_VERSION` 控制新建立生涯使用的版本，可設為 `0.1.0`、`0.2.0`、`0.3.0` 或 `0.4.0`。四守位與薪資好友賽需要 `0.4.0`；既有生涯一律依自身 engine 版本繼續，不會在中途被轉換。
+`CAREER_ENGINE_VERSION` 控制新建立生涯使用的版本，可設為 `0.1.0`、`0.2.0`、`0.3.0`、`0.4.0` 或 `0.5.0`。四守位與薪資好友賽自 `0.4.0` 起提供；`0.5.0` 會固定目前的 Content Pack 版本與 hash，並使用 30 支架空 MLB 球隊。既有生涯一律依自身 engine／內容版本繼續，不會在中途被轉換。
+
+內容提案與發布規則請見 [`docs/CONTENT_AUTHORING.md`](docs/CONTENT_AUTHORING.md)。
 
 部署方式請見 `docs/DEPLOYMENT.md`，上游同步紀錄請見 `docs/UPSTREAM_SYNC.md`。

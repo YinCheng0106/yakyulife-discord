@@ -5,6 +5,7 @@
     "": {
       "name": "yakyulife-discord",
       "dependencies": {
+        "@yakyulife/content": "workspace:*",
         "@yakyulife/core": "workspace:*",
         "@yakyulife/discord": "workspace:*",
         "@yakyulife/postgres": "workspace:*",
@@ -22,7 +23,7 @@
     },
     "apps/bot": {
       "name": "@yakyulife/bot",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@yakyulife/core": "workspace:*",
         "@yakyulife/discord": "workspace:*",
@@ -31,14 +32,25 @@
         "signale": "^1.4.0",
       },
     },
+    "packages/content": {
+      "name": "@yakyulife/content",
+      "version": "0.5.0",
+      "dependencies": {
+        "zod": "^4.1.12",
+      },
+    },
     "packages/core": {
       "name": "@yakyulife/core",
-      "version": "0.4.0",
+      "version": "0.5.0",
+      "dependencies": {
+        "@yakyulife/content": "workspace:*",
+      },
     },
     "packages/discord": {
       "name": "@yakyulife/discord",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
+        "@yakyulife/content": "workspace:*",
         "@yakyulife/core": "workspace:*",
         "discord.js": "14.26.4",
         "sharp": "0.34.3",
@@ -46,7 +58,7 @@
     },
     "packages/postgres": {
       "name": "@yakyulife/postgres",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "dependencies": {
         "@yakyulife/core": "workspace:*",
       },
@@ -171,6 +183,8 @@
 
     "@yakyulife/bot": ["@yakyulife/bot@workspace:apps/bot"],
 
+    "@yakyulife/content": ["@yakyulife/content@workspace:packages/content"],
+
     "@yakyulife/core": ["@yakyulife/core@workspace:packages/core"],
 
     "@yakyulife/discord": ["@yakyulife/discord@workspace:packages/discord"],
@@ -268,6 +282,8 @@
     "undici-types": ["undici-types@8.3.0", "", {}, "sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ=="],
 
     "ws": ["ws@8.21.3", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw=="],
+
+    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "@discordjs/rest/@discordjs/collection": ["@discordjs/collection@2.1.1", "", {}, "sha512-LiSusze9Tc7qF03sLCujF5iZp7K+vRNEDBZ86FT9aQAv3vxMLihUvKvpsCWiQ2DJq1tVckopKm1rxomgNUc9hg=="],
 

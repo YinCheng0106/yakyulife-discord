@@ -27,7 +27,7 @@ import {
 } from "discord.js";
 import { actionFromKey, parseCareerCustomId } from "./actions.ts";
 import { ATTRIBUTION } from "./attribution.ts";
-import { careerCommands } from "./commands.ts";
+import { registeredCommandDefinitions } from "./commands/registry.ts";
 import {
   parseHistoryCustomId,
   renderCareer,
@@ -628,7 +628,7 @@ export function careerErrorSeverity(error: unknown): "info" | "warn" | "error" {
 
 export function createCareerFeature(dependencies: CareerFeatureDependencies): CareerFeature {
   return {
-    commands: careerCommands,
+    commands: registeredCommandDefinitions,
     async handleInteraction(interaction) {
       const isCareerAutocomplete =
         interaction.isAutocomplete() && interaction.commandName === "career";

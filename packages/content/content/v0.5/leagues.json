@@ -1,0 +1,125 @@
+{
+  "version": "0.5.0",
+  "levels": {
+    "amateur": {
+      "league": "amateur",
+      "games": 30,
+      "par": 32,
+      "baseSalary": 0,
+      "promotionOverall": null,
+      "demotionOverall": null
+    },
+    "cpbl2": {
+      "league": "cpbl",
+      "games": 80,
+      "par": 34,
+      "baseSalary": 84,
+      "promotionOverall": 41,
+      "demotionOverall": null
+    },
+    "cpbl1": {
+      "league": "cpbl",
+      "games": 120,
+      "par": 44,
+      "baseSalary": 300,
+      "promotionOverall": null,
+      "demotionOverall": 39
+    },
+    "npb2": {
+      "league": "npb",
+      "games": 110,
+      "par": 45,
+      "baseSalary": 720,
+      "promotionOverall": 53,
+      "demotionOverall": null
+    },
+    "npb1": {
+      "league": "npb",
+      "games": 143,
+      "par": 54,
+      "baseSalary": 2400,
+      "promotionOverall": null,
+      "demotionOverall": 49
+    },
+    "rookie": {
+      "league": "mlb",
+      "games": 60,
+      "par": 34,
+      "baseSalary": 180,
+      "promotionOverall": 38,
+      "demotionOverall": null
+    },
+    "a": {
+      "league": "mlb",
+      "games": 132,
+      "par": 39,
+      "baseSalary": 300,
+      "promotionOverall": 43,
+      "demotionOverall": 33
+    },
+    "high_a": {
+      "league": "mlb",
+      "games": 132,
+      "par": 44,
+      "baseSalary": 420,
+      "promotionOverall": 48,
+      "demotionOverall": 38
+    },
+    "aa": {
+      "league": "mlb",
+      "games": 138,
+      "par": 49,
+      "baseSalary": 600,
+      "promotionOverall": 54,
+      "demotionOverall": 43
+    },
+    "aaa": {
+      "league": "mlb",
+      "games": 150,
+      "par": 53,
+      "baseSalary": 1200,
+      "promotionOverall": 61,
+      "demotionOverall": 48
+    },
+    "mlb": {
+      "league": "mlb",
+      "games": 162,
+      "par": 63,
+      "baseSalary": 24000,
+      "promotionOverall": null,
+      "demotionOverall": 56
+    },
+    "kbo2": {
+      "league": "kbo",
+      "games": 118,
+      "par": 43,
+      "baseSalary": 600,
+      "promotionOverall": 50,
+      "demotionOverall": null
+    },
+    "kbo1": {
+      "league": "kbo",
+      "games": 144,
+      "par": 51,
+      "baseSalary": 1800,
+      "promotionOverall": null,
+      "demotionOverall": 46
+    },
+    "abl": {
+      "league": "abl",
+      "games": 39,
+      "par": 40,
+      "baseSalary": 180,
+      "promotionOverall": null,
+      "demotionOverall": null
+    },
+    "international": {
+      "league": "international",
+      "games": 8,
+      "par": 54,
+      "baseSalary": 0,
+      "promotionOverall": null,
+      "demotionOverall": null
+    }
+  }
+}
