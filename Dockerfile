@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.14 AS build
+FROM oven/bun:1.4.2 AS build
 WORKDIR /app
 COPY package.json bun.lock tsconfig.json bunfig.toml biome.json ./
 COPY apps ./apps
@@ -7,7 +7,7 @@ COPY scripts ./scripts
 RUN bun install --frozen-lockfile
 RUN bun run build
 
-FROM oven/bun:1.3.14-slim AS runtime
+FROM oven/bun:1.4.2-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production
